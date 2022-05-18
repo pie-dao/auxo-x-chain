@@ -52,4 +52,7 @@ interface IStrategy {
 
     /// @notice An estimate amount of underlying managed by the strategy.
     function estimatedUnderlying() external returns (uint256);
+
+    /// @notice Report underlying from different domain (chain).
+    function report(uint256 underlyingAmount) external;
 }

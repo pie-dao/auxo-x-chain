@@ -27,6 +27,18 @@ import {IAnyswapRouter} from "./interfaces/IAnyswapRouter.sol";
 contract XChainHub is LayerZeroApp {
     using SafeERC20 for IERC20;
 
+    /// Actions
+
+    uint8 internal constant DEPOSIT_ACTION = 0;
+    uint8 internal constant REQUEST_WITHDRAW_ACTION = 1;
+    uint8 internal constant FINALIZE_WITHDRAW_ACTION = 2;
+    uint8 internal constant REPORT_UNDERLYING_ACTION = 3;
+
+    /// Report delay
+    uint64 internal constant REPORT_DELAY = 6 hours;
+
+    /// Message struct
+
     struct Message {
         uint8 action;
         bytes payload;
@@ -48,11 +60,6 @@ contract XChainHub is LayerZeroApp {
     /// @notice Indicates withdrawn amount per round for a given vault.
     mapping(address => mapping(uint256 => uint256)) public withdrawnPerRound;
 
-    /// @notice Exit requests from other chains.
-    /// @dev (chainId => strategy => round => amount)
-    mapping(uint16 => mapping(address => mapping(uint256 => uint256)))
-        public exitRequests;
-
     /// @notice Shares held on behalf of strategies from other chains.
     /// @dev This is for DESTINATION CHAIN.
     /// @dev Each strategy will have one and only one underlying forever.
@@ -71,6 +78,9 @@ contract XChainHub is LayerZeroApp {
     mapping(uint16 => mapping(address => uint256))
         public exitingSharesPerStrategy;
 
+    /// @notice Latest updates per strategy
+    mapping(uint16 => mapping(address => uint256)) public latestUpdate;
+
     constructor(address anyswapEndpoint, address lzEndpoint)
         LayerZeroApp(lzEndpoint)
     {
@@ -83,6 +93,48 @@ contract XChainHub is LayerZeroApp {
 
     function setExiting(address vault, bool exit) external onlyOwner {
         exiting[vault] = exit;
+    }
+
+    function reportUnderlying(
+        IVault vault,
+        uint16[] memory dstChains,
+        address[] memory strats,
+        bytes memory adapterParams
+    ) external payable onlyOwner {
+        require(
+            trustedVault[address(vault)],
+            "XChainHub: vault is not trusted."
+        );
+
+        require(
+            dstChains.length == strats.length,
+            "XChainHub: dstChains and strats wrong length"
+        );
+
+        uint256 amountToReport;
+        uint256 exchangeRate = vault.exchangeRate();
+        for (uint256 i; i < dstChains.length; i++) {
+            uint256 shares = sharesPerStrategy[dstChains[i]][strats[i]];
+
+            require(shares > 0, "XChainHub: strat has no deposits");
+
+            require(
+                latestUpdate[dstChains[i]][strats[i]] >=
+                    (block.timestamp + REPORT_DELAY),
+                "XChainHub: latest update too recent"
+            );
+
+            latestUpdate[dstChains[i]][strats[i]] = block.timestamp;
+            amountToReport = (shares * exchangeRate) / 10**vault.decimals();
+
+            _lzSend(
+                dstChains[i],
+                abi.encode(REPORT_UNDERLYING_ACTION, strats[i], amountToReport),
+                payable(msg.sender),
+                address(0),
+                adapterParams
+            );
+        }
     }
 
     function finalizeWithdrawFromVault(IVault vault) external onlyOwner {
@@ -124,7 +176,7 @@ contract XChainHub is LayerZeroApp {
 
         _lzSend(
             dstChainId,
-            abi.encode(0, dstVault, msg.sender, amount, minOut),
+            abi.encode(DEPOSIT_ACTION, dstVault, msg.sender, amount, minOut),
             refundAddress,
             address(0),
             adapterParams
@@ -186,15 +238,18 @@ contract XChainHub is LayerZeroApp {
             srcAddress := mload(add(_srcAddress, 20))
         }
 
-        if (message.action == 0) {
+        if (message.action == DEPOSIT_ACTION) {
             // deposit
             _depositAction(_srcChainId, message.payload);
-        } else if (message.action == 1) {
+        } else if (message.action == REQUEST_WITHDRAW_ACTION) {
             // request exit
-            _requestExitAction(_srcChainId, message.payload);
-        } else if (message.action == 2) {
+            _requestWithdrawAction(_srcChainId, message.payload);
+        } else if (message.action == FINALIZE_WITHDRAW_ACTION) {
             // finalize exit
-            _finalizeExitAction(_srcChainId, message.payload);
+            _finalizeWithdrawAction(_srcChainId, message.payload);
+        } else if (message.action == REPORT_UNDERLYING_ACTION) {
+            // receive report
+            _reportUnderlyingAction(message.payload);
         } else {
             revert();
         }
@@ -228,7 +283,7 @@ contract XChainHub is LayerZeroApp {
         sharesPerStrategy[_srcChainId][strategy] += mintedShares;
     }
 
-    function _requestExitAction(uint16 _srcChainId, bytes memory _payload)
+    function _requestWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
     {
         (IVault vault, address strategy, uint256 amount) = abi.decode(
@@ -261,7 +316,7 @@ contract XChainHub is LayerZeroApp {
         vault.enterBatchBurn(amount);
     }
 
-    function _finalizeExitAction(uint16 _srcChainId, bytes memory _payload)
+    function _finalizeWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
     {
         (IVault vault, address strategy) = abi.decode(
@@ -301,5 +356,14 @@ contract XChainHub is LayerZeroApp {
             strategyAmount,
             _srcChainId
         );
+    }
+
+    function _reportUnderlyingAction(bytes memory payload) internal {
+        (IStrategy strategy, uint256 amountToReport) = abi.decode(
+            payload,
+            (IStrategy, uint256)
+        );
+
+        strategy.report(amountToReport);
     }
 }
