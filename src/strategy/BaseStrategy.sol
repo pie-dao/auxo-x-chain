@@ -76,7 +76,7 @@ abstract contract BaseStrategy is ReentrancyGuard {
     );
 
     /// @notice Event emitted when underlying is deposited in this strategy.
-    event Deposit(address indexed vault, uint256 amount);
+    event Deposited(address indexed vault, uint256 amount);
 
     /// @notice Event emitted when underlying is withdrawn from this strategy.
     event Withdraw(address indexed vault, uint256 amount);
@@ -142,7 +142,7 @@ abstract contract BaseStrategy is ReentrancyGuard {
         depositedUnderlying += amount;
         underlying.safeTransferFrom(msg.sender, address(this), amount);
 
-        emit Deposit(msg.sender, amount);
+        emit Deposited(msg.sender, amount);
 
         success = SUCCESS;
     }
