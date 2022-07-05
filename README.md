@@ -57,15 +57,38 @@ Currently, the hub utilises the [Anyswap router](https://github.com/anyswap/Cros
 
 Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
 
-- [ ] Add the `IStargateRouter` to the list of interfaces
-- [ ] Replace the AnySwap swaps with `IStargateRouter.swap`
-    - [ ] `_finalizeWithdrawAction`
-    - [ ] `constructor`
-    - [ ] `depositToChain`
+- [x] Add the `IStargateRouter` to the list of interfaces
+- [x] Replace the AnySwap swaps with `IStargateRouter.swap`
+    - [x] `_finalizeWithdrawAction`
+    - [x] `constructor`
+    - [x] `depositToChain`
 
-- [ ] Replace* the `_lzSend` messages with encoded payloads in `IStargateRouter.swap`
-    - [ ] `depositToChain`
-    - [ ] `reportUnderlying`*
-- [ ] Replace the `_nonBlockingLzReceive` with `IStargateReceiver.sgReceive`
+- [x] Replace* the `_lzSend` messages with encoded payloads in `IStargateRouter.swap`
+    - [x] `depositToChain`
 
-> \*[IStargateRouter](https://stargateprotocol.gitbook.io/stargate/interfaces/evm-solidity-interfaces/istargaterouter.sol) *does not appear to have a way of sending just messages across (without swaps), it may be that we have to implement both LayerZero and stargate to get the cross chain reporting* 
+- [x] Keep _lzSend in:
+    - [x] `reportUnderlying`
+    - [x] `finalizeWithdrawFromChain`
+
+## Known set of implementation tasks to work on:
+- [ ] Implement events at different stages of the contract
+- [ ] Remove the NI error if we don't need it
+- [ ] Confirm the Noop action with Team
+- [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
+- [ ] Connect finalizeWithdrawFromVault to a cross chain action
+- [ ] Ensure the format of messages in `sgReceive` matches the encoding in `IStargateRouter.swap` - currently in format `encoded(Message(, encoded(payload)))`
+- [ ] See if the reducers can be combined by passing the payloads from both entrypoints
+- [ ] Confirm the params for both stargate swaps:
+    - [ ] default lzTxObj
+    - [ ] minAmountOut
+    - [ ] destination (strategy?)
+- [ ] Refactoring: start to break down some of the larger functions into smaller chunks
+
+## Testing
+- [ ] Setup the mocks:
+    - [ ] LayerZero
+    - [ ] Stargate
+- [ ] Define the unit test suite
+- [ ] Build integration test scripts for the testnets
+
+
