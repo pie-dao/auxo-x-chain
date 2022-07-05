@@ -16,7 +16,6 @@ pragma solidity ^0.8.10;
 import {IVault} from "./IVault.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 
-
 /// @title IStrategy
 /// @notice Basic Vault Strategy interface.
 interface IStrategy {

@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@jordaniza 
+jordaniza
+/
+auxo-x-chain
+Public
+forked from pie-dao/auxo-x-chain
+Code
+Pull requests
+1
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+auxo-x-chain/src/XChainHub.sol
+@jordaniza
+jordaniza added prep docs for the stargate work
+Latest commit 7c69005 18 hours ago
+ History
+ 2 contributors
+@dantop114@jordaniza
+497 lines (416 sloc)  18.7 KB
+
 //   ______
 //  /      \
 // /$$$$$$  | __    __  __    __   ______
@@ -495,3 +526,17 @@ contract XChainHub is LayerZeroApp {
         strategy.report(amountToReport);
     }
 }
+Footer
+© 2022 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
