@@ -18,4 +18,22 @@
 
 
 */
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.12;
+
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
+import {XChainStargateHub} from "../src/XChainStargateHub.sol";
+import {IStargateRouter} from "../src/interfaces/IStargateRouter.sol";
+
+contract TestXChainStargateHub is Test {
+    XChainStargateHub public hub;
+
+    function setUp() public {
+        hub = new XChainStargateHub(address(0), address(0));
+    }
+
+    function testItBuilds() public {
+        IStargateRouter router = hub.stargateRouter();
+        console.log(address(router));
+    }
+}

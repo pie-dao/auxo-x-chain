@@ -72,17 +72,21 @@ Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
 
 ## Known set of implementation tasks to work on:
 - [ ] Implement events at different stages of the contract
-- [ ] Remove the NI error if we don't need it
+- [x] Remove the NI error if we don't need it
 - [ ] Confirm the Noop action with Team
-- [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
 - [ ] Connect finalizeWithdrawFromVault to a cross chain action
+- [ ] Confirm that finalizeWithdrawFromVault is a step in _finalizeWithdrawAction
 - [ ] Ensure the format of messages in `sgReceive` matches the encoding in `IStargateRouter.swap` - currently in format `encoded(Message(, encoded(payload)))`
-- [ ] See if the reducers can be combined by passing the payloads from both entrypoints
+    - [ ] Pass all payloads a Message structs
+    - [ ] Check encodings, in particular encoding IVaults and IStrategies
+    - [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
+- [x] See if the reducers can be combined by passing the payloads from both entrypoints
 - [ ] Confirm the params for both stargate swaps:
     - [ ] default lzTxObj
     - [ ] minAmountOut
     - [ ] destination (strategy?)
 - [ ] Refactoring: start to break down some of the larger functions into smaller chunks
+
 
 ## Testing
 - [ ] Setup the mocks:

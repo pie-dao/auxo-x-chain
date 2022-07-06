@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.12;
 
-import {XChainHub} from "../XChainHub.sol";
+import {XChainHub} from "../XChainHubAnyswap.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {BaseStrategy} from "./BaseStrategy.sol";
 

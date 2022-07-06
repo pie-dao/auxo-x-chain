@@ -26,7 +26,7 @@ import {IStargateRouter} from "./interfaces/IStargateRouter.sol";
 
 /// @title XChainHub
 /// @dev Expect this contract to change in future.
-contract XChainHub is LayerZeroApp, IStargateReceiver {
+contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     using SafeERC20 for IERC20;
 
     /*///////////////////////////////////////////////////////////////
@@ -55,12 +55,6 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     event CrossChainNoopReceived(uint16 _srcChainId);
 
     /*///////////////////////////////////////////////////////////////
-                                Errors
-    //////////////////////////////////////////////////////////////*/
-
-    error NotImplemented();
-
-    /*///////////////////////////////////////////////////////////////
                             Action Enums
     //////////////////////////////////////////////////////////////*/
 
@@ -73,7 +67,7 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     /// Report underlying from different chain
     uint8 internal constant REPORT_UNDERLYING_ACTION = 3;
     /// Intentional Noop for  when swap is triggered on dstChain
-    uint8 internal constant NO_ACTION = 3;
+    uint8 internal constant NO_ACTION = 4;
 
     /*///////////////////////////////////////////////////////////////
                             Structs
@@ -121,10 +115,10 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice Shares held on behalf of strategies from other chains.
     /// @dev This is for DESTINATION CHAIN.
-    /// @dev Each strategy will have one and only one underlying forever.
-    /// @dev So we map the shares held like:
-    /// @dev     (chainId => strategy => shares)
-    /// @dev eg. when a strategy deposits from chain A to chain B
+    ///      Each strategy will have one and only one underlying forever.
+    ///      So we map the shares held like:
+    ///          (chainId => strategy => shares)
+    ///      eg. when a strategy deposits from chain A to chain B
     ///          the XChainHub on chain B will account for minted shares.
     mapping(uint16 => mapping(address => uint256)) public sharesPerStrategy;
 
@@ -145,9 +139,8 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
                             Constructor
     //////////////////////////////////////////////////////////////*/
 
-    /// @param anyswapEndpoint TO BE DEPRECATED
-    /// @dev will be replaced with stargate
-    /// @param lzEndpoint address of the layerZero endpoint contract on the source chain
+    /// @param address of the stargate endpoint on the src chain
+    /// @param address of the layerZero endpoint contract on the src chain
     constructor(address stargateEndpoint, address lzEndpoint)
         LayerZeroApp(lzEndpoint)
     {
@@ -160,7 +153,7 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice updates a vault on the current chain to be either trusted or untrusted
     /// @dev trust determines whether a vault can be interacted with
-    /// @dev This is callable only by the owner
+    ///      This is callable only by the owner
     function setTrustedVault(address vault, bool trusted) external onlyOwner {
         trustedVault[vault] = trusted;
     }
@@ -222,12 +215,21 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
 
             amountToReport = (shares * exchangeRate) / 10**vault.decimals();
 
+            Message message = Message({
+                action: REPORT_UNDERLYING_ACTION,
+                payload: abi.encode(
+                    strats[i],
+                    amountToReport,
+                    (IStrategy, uint256)
+                )
+            });
+
             // See Layer zero docs for details on _lzSend
             // Corrolary method is _nonblockingLzReceive which will be invoked
             //      on the destination chain
             _lzSend(
                 dstChains[i],
-                abi.encode(REPORT_UNDERLYING_ACTION, strats[i], amountToReport),
+                abi.encode(message, (Message)),
                 payable(msg.sender),
                 address(0),
                 adapterParams
@@ -246,8 +248,6 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
         uint256 withdrawn = underlying.balanceOf(address(this)) - balanceBefore;
 
         withdrawnPerRound[address(vault)][round] = withdrawn;
-
-        /// @dev I think here we might need to execute the swap
     }
 
     /// @notice makes a deposit of the underyling token into the vault on a given chain
@@ -287,13 +287,16 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
 
         // encode payload to be sent along with the router
         /// @dev we could encode into a struct to share between src and dst
-        bytes memory payload = abi.encode(
-            DEPOSIT_ACTION,
-            _dstVault,
-            msg.sender,
-            _amount,
-            _minOut
-        );
+        Message message = Message({
+            action: DEPOSIT_ACTION,
+            payload: abi.encode(
+                _dstVault,
+                msg.sender,
+                _amount,
+                _minOut,
+                (IVault, address, uint256, uint256)
+            )
+        });
 
         stargateRouter.swap{value: msg.value}(
             _dstChainId,
@@ -304,7 +307,7 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
             _minOut,
             IStargateRouter.lzTxObj(200000, 0, "0x"), /// @dev review this default value
             abi.encodePacked(_dstVault), // This vault must implement sgReceive
-            payload
+            abi.encode(message, (Message))
         );
     }
 
@@ -323,9 +326,19 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
             "XChainHub: sender is not a trusted strategy"
         );
 
+        Message message = Message({
+            action: REQUEST_WITHDRAW_ACTION,
+            payload: abi.encode(
+                dstVault,
+                msg.sender,
+                amount,
+                (IVault, address, uint256)
+            )
+        });
+
         _lzSend(
             dstChainId,
-            abi.encode(REQUEST_WITHDRAW_ACTION, dstVault, msg.sender, amount),
+            abi.encode(message, (Message)),
             refundAddress,
             address(0),
             adapterParams
@@ -337,7 +350,6 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     function finalizeWithdrawFromChain(
         uint16 dstChainId,
         address dstVault,
-        uint256 amount,
         bytes memory adapterParams,
         address payable refundAddress
     ) external payable {
@@ -346,9 +358,14 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
             "XChainHub: sender is not a trusted strategy"
         );
 
+        Message message = Message({
+            action: FINALIZE_WITHDRAW_ACTION,
+            payload: abi.encode(dstVault, msg.sender, (address, address))
+        });
+
         _lzSend(
             dstChainId,
-            abi.encode(FINALIZE_WITHDRAW_ACTION, dstVault, msg.sender),
+            abi.encode(message, (Message)),
             refundAddress,
             address(0),
             adapterParams
@@ -356,10 +373,47 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     }
 
     /*///////////////////////////////////////////////////////////////
-                                Reducers
+                                Reducer
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice pass actions from other entrypoint functions here
+    /// @dev sgReceive and _nonBlockingLzReceive both call this function
+    /// @param _srcChainId the layerZero chain ID
+    /// @param _srcAddress the bytes representation of the address requesting the tx
+    /// @param message containing action type and payload
+    function _reducer(
+        uint16 _srcChainId,
+        bytes memory _srcAddress,
+        Message message
+    ) internal {
+        address srcAddress;
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            srcAddress := mload(add(_srcAddress, 20))
+        }
+
+        if (message.action == DEPOSIT_ACTION) {
+            _depositAction(_srcChainId, message.payload);
+        } else if (message.action == REQUEST_WITHDRAW_ACTION) {
+            _requestWithdrawAction(message.payload);
+        } else if (message.action == FINALIZE_WITHDRAW_ACTION) {
+            _finalizeWithdrawAction(_srcChainId, message.payload);
+        } else if (message.action == REPORT_UNDERLYING_ACTION) {
+            _reportUnderlyingAction(message.payload);
+        } else if (message.action == NO_ACTION) {
+            emit CrossChainNoopReceived(_srcChainId);
+        } else {
+            revert("XChainHub: UNRECOGNISED ACTION");
+        }
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                            Entrypoints
     //////////////////////////////////////////////////////////////*/
 
     /// @notice called by the stargate application on the dstChain
+    /// @dev invoked when IStargateRouter.swap is called
+
     function sgReceive(
         uint16 _srcChainId,
         bytes memory _srcAddress,
@@ -370,33 +424,19 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     ) external override {
         require(
             msg.sender == address(stargateRouter),
-            "only stargate router can call sgReceive!"
+            "XChainHub:CALLER NOT STARGATE ROUTER"
         );
 
-        // check that the message is encoded properly
         Message memory message = abi.decode(_payload, (Message));
 
-        address srcAddress;
+        require(
+            message.action == NO_ACTION ||
+                message.action == DEPOSIT_ACTION ||
+                message.action == FINALIZE_WITHDRAW_ACTION,
+            "XChainHub:DISALLOWED ACTION SGRECIEVE"
+        );
 
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            srcAddress := mload(add(_srcAddress, 20))
-        }
-
-        if (
-            message.action == REPORT_UNDERLYING_ACTION ||
-            message.action == REQUEST_WITHDRAW_ACTION
-        ) {
-            revert("XChainHub: Calling Lz Method in sgReceieve");
-        } else if (message.action == FINALIZE_WITHDRAW_ACTION) {
-            _finalizeWithdrawAction(_srcChainId, message.payload);
-        } else if (message.action == DEPOSIT_ACTION) {
-            _depositAction(_srcChainId, message.payload);
-        } else if (message.action == NO_ACTION) {
-            emit CrossChainNoopReceived(_srcChainId);
-        } else {
-            revert("XChainHub: Unrecognised Action sgReceive");
-        }
+        _reducer(_srcChainId, _srcAddress, message);
     }
 
     /// @notice called by the Lz application on the dstChain,
@@ -409,40 +449,33 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
     function _nonblockingLzReceive(
         uint16 _srcChainId,
         bytes memory _srcAddress,
+        uint64,
         bytes memory _payload
     ) internal virtual override {
         // Add require lzApplication?
 
         Message memory message = abi.decode(_payload, (Message));
 
-        address srcAddress;
+        require(
+            message.action == NO_ACTION ||
+                message.action == REPORT_UNDERLYING_ACTION ||
+                message.action == REQUEST_WITHDRAW_ACTION,
+            "XChainHub:DISALLOWED ACTION LZRECEIVE"
+        );
 
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            srcAddress := mload(add(_srcAddress, 20))
-        }
-
-        if (
-            message.action == FINALIZE_WITHDRAW_ACTION ||
-            message.action == DEPOSIT_ACTION
-        ) {
-            revert(
-                "XChainHub: Calling Stargate Method in _nonBlockingLzReceive"
-            );
-        } else if (message.action == REQUEST_WITHDRAW_ACTION) {
-            _requestWithdrawAction(_srcChainId, message.payload);
-        } else if (message.action == REPORT_UNDERLYING_ACTION) {
-            _reportUnderlyingAction(message.payload);
-        } else if (message.action == NO_ACTION) {
-            emit CrossChainNoopReceived(_srcChainId);
-        } else {
-            revert("XChainHub: Unrecognised Action in _nonBlockingLzReceive");
-        }
+        _reducer(_srcChainId, _srcAddress, message);
     }
 
     /*///////////////////////////////////////////////////////////////
                             Action Functions
     //////////////////////////////////////////////////////////////*/
+
+    struct DepositPayload {
+        IVault vault;
+        address strategy;
+        uint256 amount;
+        uint256 min;
+    }
 
     /// @param _srcChainId what layerZero chainId was the request initiated from
     /// @param _payload abi encoded as follows:
@@ -476,6 +509,12 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
         );
 
         sharesPerStrategy[_srcChainId][strategy] += mintedShares;
+    }
+
+    struct RequestWithdrawPayload {
+        IVault vault;
+        address strategy;
+        uint256 amount;
     }
 
     /// @notice enter the batch burn for a vault on the current chain
@@ -516,6 +555,13 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
         exitingSharesPerStrategy[_srcChainId][strategy] += amount;
 
         vault.enterBatchBurn(amount);
+    }
+
+    struct FinalizeWithdrawPayload {
+        IVault vault;
+        address strategy;
+        uint16 srcPoolId;
+        uint16 dstPoolId;
     }
 
     /// @notice executes a withdrawal of underlying tokens from a vault
@@ -564,6 +610,9 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
         uint256 strategyAmount = (amountPerShare * exitingShares) /
             (10**vault.decimals());
 
+        /// @dev we need to check this
+        finalizeWithdrawFromVault(vault);
+
         underlying.safeApprove(address(stargateRouter), strategyAmount);
 
         /// @dev review and change minAmountOut and txParams before moving to production
@@ -578,6 +627,11 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
             strategy,
             abi.encode(NO_ACTION, (uint8))
         );
+    }
+
+    struct ReportUnderlyingPayload {
+        IStrategy strategy;
+        uint256 amountToReport;
     }
 
     /// @notice underlying holdings are updated on another chain and this function is broadcast
