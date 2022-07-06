@@ -388,11 +388,10 @@ contract XChainHub is LayerZeroApp, IStargateReceiver {
         if (message.action == DEPOSIT_ACTION) {
             // Deposit Action from payload in the stargate swap.
             _depositAction(_srcChainId, message.payload);
-
-            // TODO This feels wrong, shouldn't this action come from a message instead of a callback of a swap????
-            // ^^^^^^^^^^^^^^^^^^^^^^^^
         } else if (message.action == FINALIZE_WITHDRAW_ACTION) {
             _finalizeWithdrawAction(_srcChainId, message.payload);
+            // TODO This feels wrong, shouldn't this action come from a message instead of a callback of a swap????
+            // ^^^^^^^^^^^^^^^^^^^^^^^^
         } else if (message.action == NO_ACTION) {
             emit CrossChainNoopReceived(_srcChainId);
         } else {
