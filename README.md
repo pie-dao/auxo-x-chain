@@ -38,6 +38,21 @@ Therefore, each cross chain request will go through the following workflow:
 3. The LZ endpoint will call `_nonBlockingLzReceive` on the destination chain.
 4. The reducer at `_nonBlockingLzReceive` will call the corresponding action passed in the payload (i.e. `_depositAction`)
 
+
+A simple Diagram outlining the hub's interaction with strategies:
+```
+User -->  Vault
+            --> Strategy A
+            --> Strategy B
+            --> Strategy C // x-chain
+                --> Origin HUB --------------------------> Dest Hub
+                               <-------------------------- Report
+                <--------------                                   ------------> Dest Vault 
+                                                                                --> Strategy A
+                                                                                --> Strategy B
+                                                                                --> Strategy C
+```
+
 ## Swaps
 ----------
 Currently, the hub utilises the [Anyswap router](https://github.com/anyswap/CrossChain-Router/wiki/How-to-integrate-AnySwap-Router) to execute cross chain deposits of the underlying token into the auxo vault. We are discussing removing the router and replacing with stargate. 

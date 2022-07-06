@@ -29,7 +29,7 @@ contract TestXChainStargateHub is Test {
     XChainStargateHub public hub;
 
     function setUp() public {
-        hub = new XChainStargateHub(address(0), address(0));
+        hub = new XChainStargateHub(address(0), address(0), address(0));
     }
 
     function testItBuilds() public {
