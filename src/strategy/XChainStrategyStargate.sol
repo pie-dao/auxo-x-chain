@@ -20,7 +20,7 @@ import {BaseStrategy} from "./BaseStrategy.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-contract XChainStrategy is BaseStrategy {
+contract XChainStrategyStargate is BaseStrategy {
     using SafeERC20 for IERC20;
 
     // possible states:
@@ -35,6 +35,7 @@ contract XChainStrategy is BaseStrategy {
         WITHDRAWING
     }
 
+    /// @dev this calls layerZero
     struct WithdrawParams {
         uint16 dstChain;
         address dstVault;
@@ -42,6 +43,7 @@ contract XChainStrategy is BaseStrategy {
         address payable refundAddress;
     }
 
+    /// @dev this call stargate
     struct DepositParams {
         uint16 dstChain;
         uint16 srcPoolId;
@@ -134,6 +136,7 @@ contract XChainStrategy is BaseStrategy {
         );
     }
 
+    /// @dev bug
     function estimatedUnderlying() external view override returns (uint256) {
         if (state == DepositState.NOT_DEPOSITED) {
             return float();
