@@ -111,3 +111,57 @@ Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
 - [ ] Build integration test scripts for the testnets
 
 
+
+# Deployment
+
+# Deploying a Cross Chain Application
+
+Instructions below for deploying all the components, if you want to do it manually:
+### Components
+
+- XChainHub:
+    - (R) Src 
+    - (R) Dest
+
+- XChainStrategy?
+    - (R) Src
+    - Dest
+
+- Vault:
+    - (R) Src
+    - (R) Dst
+
+- Vault Auth:
+    - (R) Src
+    - (R) Src
+
+- Token:
+    - (R) Src
+    - (R) Src
+
+- Dependencies (these must be present on the src and dst chains):
+    - Stargate
+    - LayerZero
+
+Ordering:
+- (Factory)
+- Auth
+- Vault
+- XHub
+- XStrategy
+
+# Order of Execution
+1. Deploy the contracts & link them
+2. Trust:
+    2.1 The strategy on the Vault `trustStrategy`
+    2.2 Vault on the hub `setTrustedVault`
+
+3. MerkleRoot
+    3.1 Open (No permissions)
+    3.2 Restricted
+4. Set trustedRemote for the LayerZero Application on the dst chainId
+5. User deposit into origin (src) vault
+6. (As Admin) call deposit into Strategy
+7. (As XChainStrategy manager or strategist) call deposit assets to Chain, `hub::depositToChain`
+8. (Call swap) - tokens should appear on target/dst chain (query the USDC balance of the strategy)
+

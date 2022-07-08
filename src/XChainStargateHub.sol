@@ -217,7 +217,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     function finalizeWithdrawFromVault(IVault vault) external onlyOwner {
         uint256 round = vault.batchBurnRound();
         IERC20 underlying = vault.underlying();
-
         uint256 balanceBefore = underlying.balanceOf(address(this));
         vault.exitBatchBurn();
         uint256 withdrawn = underlying.balanceOf(address(this)) - balanceBefore;
@@ -307,6 +306,8 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     /// @param _dstChainId the layerZero chain id
     /// @param _srcPoolId https://stargateprotocol.gitbook.io/stargate/developers/pool-ids
     /// @param _dstPoolId https://stargateprotocol.gitbook.io/stargate/developers/pool-ids
+    /// @param _dstHub address of the hub on the destination chain
+    /// @dev   _dstHub MUST implement sgReceive from IStargateReceiver
     /// @param _dstVault address of the vault on the destination chain
     /// @param _amount is the amount to deposit in underlying tokens
     /// @param _minOut how not to get rekt
@@ -315,6 +316,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         uint16 _dstChainId,
         uint16 _srcPoolId,
         uint16 _dstPoolId,
+        address _dstHub, // we also need the destination hub
         address _dstVault,
         uint256 _amount,
         uint256 _minOut,
@@ -348,12 +350,15 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             _amount,
             _minOut,
             IStargateRouter.lzTxObj(200000, 0, "0x"), /// @dev review this default value
-            abi.encodePacked(_dstVault), // This vault must implement sgReceive
+            abi.encodePacked(_dstHub), // This hub must implement sgReceive
             abi.encode(message)
         );
     }
 
     /// @notice Only called by x-chain Strategy
+    /// @dev IMPORTANT you need to add the dstHub as a trustedRemote on the src chain BEFORE calling
+    ///      any layerZero functions. Call `setTrustedRemote` on this contract as the owner
+    ///      with the params (dstChainId - LAYERZERO, dstHub address)
     /// @notice make a request to withdraw tokens from a vault on a specified chain
     ///     the actual withdrawal takes place once the batch burn process is completed
     /// @param dstChainId the layerZero chain id on destination
@@ -631,9 +636,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             (10**_vault.decimals()));
     }
 
-    /// @notice executes a withdrawal of underlying tokens from a vault
-    ///        to a strategy on the source chain
-    /// @dev why strategy and not the user?
+    /// @notice executes a withdrawal of underlying tokens from a vault to a strategy on the source chain
     /// @param _srcChainId what layerZero chainId was the request initiated from
     /// @param _payload abi encoded as follows:
     ///    IVault

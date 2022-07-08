@@ -7,7 +7,7 @@ import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {XChainStargateHub} from "../src/XChainStargateHub.sol";
 import {XChainStargateHubMockReducer} from "./mocks/MockXChainStargateHub.sol";
 import {AuxoTest} from "./mocks/MockERC20.sol";
-// import {MockVault} from "./mocks/MockVault.sol";
+import {MockVault} from "./mocks/MockVault.sol";
 import {IStargateRouter} from "../src/interfaces/IStargateRouter.sol";
 import {IVault} from "../src/interfaces/IVault.sol";
 
@@ -141,6 +141,7 @@ contract TestXChainStargateHub is Test {
     }
 
     function testLayerZeroCannotBeCalledByExternal(address _caller) public {
+        vm.assume(_caller != address(hub));
         vm.prank(_caller);
         vm.expectRevert(bytes("LayerZeroApp: caller must be address(this)"));
         hub.nonblockingLzReceive(1, abi.encodePacked(vaultAddr), 1, bytes(""));
@@ -175,9 +176,25 @@ contract TestXChainStargateHub is Test {
     }
 
     // test finalizeWithdrawFromVault
-    function finalizeWithdrawFromVault() public {
+    function testFinalizeWithdrawFromVault() public {
+        // setup the token
         ERC20 token = new AuxoTest();
         assertEq(token.balanceOf(address(this)), 1e27);
+
+        // setup the mock vault and wrap it
+        MockVault _vault = new MockVault(token);
+        IVault tVault = IVault(address(_vault));
+        token.transfer(address(_vault), 1e26); // 1/2 balance
+        assertEq(token.balanceOf(address(_vault)), 1e26);
+
+        // execute the action
+        hub.finalizeWithdrawFromVault(tVault);
+
+        // check the value, corresponds to the mock vault expected outcome
+        assertEq(
+            hub.withdrawnPerRound(address(_vault), 2),
+            _vault.expectedWithdrawal()
+        );
     }
 
     // REPORT UNDERLYING
