@@ -53,7 +53,7 @@ deploy-arbitrum-rink :; forge create --rpc-url https://rinkeby.arbitrum.io/rpc \
 
 # Deploy the xchain strategy - kovan opt
 deploy-strat-kovan-opt :; forge create --rpc-url https://kovan.optimism.io \
-    --constructor-args "0xaec4b887141733802cb8caff45ce7f87e9cf2334" "0xaf29ba76af7ef547b867eba712a776c61b40ed02" "0x567f39d9e6d02078F357658f498F80eF087059aa" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "Test Strategy" \
+    --constructor-args "0x5417b42215921b129aa13a2a54661b6b0e4f87fe" "0xaf29ba76af7ef547b867eba712a776c61b40ed02" "0x567f39d9e6d02078F357658f498F80eF087059aa" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "Test Strategy" \
     --private-key ${PRIVATE_KEY} src/strategy/XChainStrategyStargate.sol:XChainStrategyStargate \
     --etherscan-api-key ${ETHERSCAN_API_KEY_KOVAN_OPTIMISM} \
     --verify

@@ -204,6 +204,13 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         trustedVault[vault] = trusted;
     }
 
+    function setTrustedStrategy(address strategy, bool trusted)
+        external
+        onlyOwner
+    {
+        trustedStrategy[strategy] = trusted;
+    }
+
     /// @notice indicates whether the vault is in an `exiting` state
     ///     which restricts certain methods
     /// @dev This is callable only by the owner

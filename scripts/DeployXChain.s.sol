@@ -21,10 +21,10 @@ contract XChainHubOptimism is Script {
 
     uint16 _dstChainIdArbtrium = 10010;
 
-    address constant hubAddress = 0xaEc4B887141733802Cb8CaFF45ce7F87e9Cf2334;
+    address constant hubAddress = 0x5417B42215921b129Aa13a2A54661B6b0E4F87Fe;
     address constant vaultAddr = 0xaF29Ba76af7ef547b867ebA712a776c61B40Ed02;
     address constant vaultAddrDst = 0x2E05590c1B24469eAEf2B29c6c7109b507ec2544;
-    address constant stratAddr = 0xFA0299ef90F0351918eCdc8f091053335DCfb8c9;
+    address constant stratAddr = 0xdE3D13189F8ea601868402E9071d21c6544B8be3;
     address constant hubDstAddr = 0x69b8C988b17BD77Bb56BEe902b7aB7E64F262F35;
 
     XChainStargateHub public hub;
@@ -39,6 +39,7 @@ contract XChainHubOptimism is Script {
 
     function trustedRemote() public {
         // set trusted remote
+        // TODO reploy this on destChain
         bytes memory _hubDst = abi.encodePacked(hubDstAddr);
         vm.broadcast(owner);
         hub.setTrustedRemote(_dstChainIdArbtrium, _hubDst);
@@ -49,23 +50,20 @@ contract XChainHubOptimism is Script {
         vault = IVault(vaultAddr);
         strat = XChainStrategyStargate(stratAddr);
 
-        vm.prank(owner);
-        hub.
-
         // need to add a way to set a trusted strategy
-
-
-        // strat.depositUnderlying(
-        //     1e9,
-        //     0,
-        //     XChainStrategyStargate.DepositParams(
-        //         _dstChainIdArbtrium,
-        //         1,
-        //         1,
-        //         hubDstAddr,
-        //         vaultAddrDst,
-        //         payable(refundRecipient)
-        //     )
-        // );
+        //hub.setTrustedStrategy(stratAddr, true);
+        vm.broadcast(owner);
+        strat.depositUnderlying{value: 1 ether}(
+            1e9,
+            0,
+            XChainStrategyStargate.DepositParams(
+                _dstChainIdArbtrium,
+                1,
+                1,
+                hubDstAddr,
+                vaultAddrDst,
+                payable(refundRecipient)
+            )
+        );
     }
 }

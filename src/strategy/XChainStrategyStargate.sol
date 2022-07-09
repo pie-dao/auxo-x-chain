@@ -76,6 +76,11 @@ contract XChainStrategyStargate is BaseStrategy {
         hub = hub_;
     }
 
+    /// @dev TODO REMOVE
+    function setHub(XChainStargateHub hub_) external {
+        hub = hub_;
+    }
+
     function depositUnderlying(
         uint256 amount,
         uint256 minAmount,
@@ -142,7 +147,7 @@ contract XChainStrategyStargate is BaseStrategy {
             return float();
         }
 
-        return reportedUnderlying;
+        return reportedUnderlying; // + float() ?
     }
 
     function report(uint256 reportedAmount) external {
