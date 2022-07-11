@@ -52,10 +52,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     event CrossChainNoopReceived(uint16 _srcChainId);
 
-    // --------------------------
-    // Action Enums
-    // --------------------------
-
     /// @dev some actions involve starge swaps while others involve lz messages
     ///     We can divide the uint8 range of 0 - 255 into 3 groups
     ///     0 - 85: Actions should only be triggered by LayerZero
@@ -65,6 +61,9 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ///     but also allows for an easy check to see if actions are valid depending on the
     ///     entrypoint
 
+    // --------------------------
+    //     Actions Reducer
+    // --------------------------
     uint8 public constant LAYER_ZERO_MAX_VALUE = 85;
     uint8 public constant STARGATE_MAX_VALUE = 171;
 
@@ -276,6 +275,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         underlying.safeApprove(address(stargateRouter), _amount);
     }
 
+    /// @dev Only Called by the Cross Chain Strategy
     /// @notice makes a deposit of the underyling token into the vault on a given chain
     /// @param _dstChainId the layerZero chain id
     /// @param _srcPoolId https://stargateprotocol.gitbook.io/stargate/developers/pool-ids
@@ -305,7 +305,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             trustedStrategy[msg.sender],
-            "XChainHub::depositToChain:UNTRUSTED"
+            "XChainHub::depositToChain:UNTRUSTED_STRATEGY"
         );
 
         /// @dev remove variables in lexical scope to fix stack too deep err
@@ -327,7 +327,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             _dstChainId,
             _srcPoolId,
             _dstPoolId,
-            _refundAddress, // refunds sent to sender
+            _refundAddress, // refunds sent to operator
             _amount,
             _minOut,
             IStargateRouter.lzTxObj(200000, 0, "0x"), /// @dev review this default value
@@ -374,7 +374,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             dstChainId,
             abi.encode(message),
             refundAddress,
-            address(0),
+            address(0), // the address of the ZRO token holder who would pay for the transaction
             adapterParams
         );
     }
@@ -399,7 +399,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ) external payable {
         require(
             trustedStrategy[msg.sender],
-            "XChainHub::finalizeWithdrawFromChain:UNTRUSTED"
+            "XChainHub::finalizeWithdrawFromChain:UNTRUSTED_STRATEGY"
         );
 
         IHubPayload.Message memory message = IHubPayload.Message({
@@ -597,17 +597,17 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_requestWithdrawAction vault is not trusted"
         );
 
         require(
             exiting[address(vault)],
-            "XChainHub: vault is not in exit window"
+            "XChainHub::_requestWithdrawAction vault is not in exit window"
         );
 
         require(
             currentRound == 0 || currentRound == round,
-            "XChainHub: strategy is already exiting from a previous round"
+            "XChainHub::_requestWithdrawAction strategy is already exiting from a previous round"
         );
 
         // update the state before entering the burn
@@ -615,7 +615,9 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         sharesPerStrategy[_srcChainId][strategy] -= amountVaultShares;
         exitingSharesPerStrategy[_srcChainId][strategy] += amountVaultShares;
 
-        vault.enterBatchBurn(amountVaultShares);
+        // TODO Test: Do we need to approve shares? I think so
+        // will revert if amount is more than what we have.
+        vault.enterBatchBurn(amount);
     }
 
     /// @notice calculate how much available to strategy based on existing shares and current batch burn round
@@ -661,20 +663,19 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             !exiting[address(vault)],
-            "XChainHub: exit window is not closed."
+            "XChainHub::_finalizeWithdrawAction exit window is not closed."
         );
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_finalizeWithdrawAction vault is not trusted"
         );
 
         require(
             currentRoundPerStrategy[_srcChainId][strategy] > 0,
-            "XChainHub: no withdraws for strategy"
+            "XChainHub::_finalizeWithdrawAction no withdraws for strategy"
         );
 
-        // why are we resetting the current round?
         currentRoundPerStrategy[_srcChainId][strategy] = 0;
         exitingSharesPerStrategy[_srcChainId][strategy] = 0;
 
@@ -689,6 +690,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         /// @dev review and change minAmountOut and txParams before moving to production
         stargateRouter.swap{value: msg.value}(
+            // TODO Is this _srcChainId the same for Layer Zero and Stargate?
             _srcChainId, // send back to the source
             payload.srcPoolId,
             payload.dstPoolId,
