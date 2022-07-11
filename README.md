@@ -38,6 +38,21 @@ Therefore, each cross chain request will go through the following workflow:
 3. The LZ endpoint will call `_nonBlockingLzReceive` on the destination chain.
 4. The reducer at `_nonBlockingLzReceive` will call the corresponding action passed in the payload (i.e. `_depositAction`)
 
+
+A simple Diagram outlining the hub's interaction with strategies:
+```
+User -->  Vault
+            --> Strategy A
+            --> Strategy B
+            --> Strategy C // x-chain
+                --> Origin HUB --------------------------> Dest Hub
+                               <-------------------------- Report
+                <--------------                                   ------------> Dest Vault 
+                                                                                --> Strategy A
+                                                                                --> Strategy B
+                                                                                --> Strategy C
+```
+
 ## Swaps
 ----------
 Currently, the hub utilises the [Anyswap router](https://github.com/anyswap/CrossChain-Router/wiki/How-to-integrate-AnySwap-Router) to execute cross chain deposits of the underlying token into the auxo vault. We are discussing removing the router and replacing with stargate. 
@@ -72,17 +87,21 @@ Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
 
 ## Known set of implementation tasks to work on:
 - [ ] Implement events at different stages of the contract
-- [ ] Remove the NI error if we don't need it
+- [x] Remove the NI error if we don't need it
 - [ ] Confirm the Noop action with Team
-- [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
 - [ ] Connect finalizeWithdrawFromVault to a cross chain action
+- [ ] Confirm that finalizeWithdrawFromVault is a step in _finalizeWithdrawAction
 - [ ] Ensure the format of messages in `sgReceive` matches the encoding in `IStargateRouter.swap` - currently in format `encoded(Message(, encoded(payload)))`
-- [ ] See if the reducers can be combined by passing the payloads from both entrypoints
+    - [ ] Pass all payloads a Message structs
+    - [ ] Check encodings, in particular encoding IVaults and IStrategies
+    - [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
+- [x] See if the reducers can be combined by passing the payloads from both entrypoints
 - [ ] Confirm the params for both stargate swaps:
     - [ ] default lzTxObj
     - [ ] minAmountOut
     - [ ] destination (strategy?)
 - [ ] Refactoring: start to break down some of the larger functions into smaller chunks
+
 
 ## Testing
 - [ ] Setup the mocks:
@@ -91,4 +110,58 @@ Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
 - [ ] Define the unit test suite
 - [ ] Build integration test scripts for the testnets
 
+
+
+# Deployment
+
+# Deploying a Cross Chain Application
+
+Instructions below for deploying all the components, if you want to do it manually:
+### Components
+
+- XChainHub:
+    - (R) Src 
+    - (R) Dest
+
+- XChainStrategy?
+    - (R) Src
+    - Dest
+
+- Vault:
+    - (R) Src
+    - (R) Dst
+
+- Vault Auth:
+    - (R) Src
+    - (R) Src
+
+- Token:
+    - (R) Src
+    - (R) Src
+
+- Dependencies (these must be present on the src and dst chains):
+    - Stargate
+    - LayerZero
+
+Ordering:
+- (Factory)
+- Auth
+- Vault
+- XHub
+- XStrategy
+
+# Order of Execution
+1. Deploy the contracts & link them
+2. Trust:
+    2.1 The strategy on the Vault `trustStrategy`
+    2.2 Vault on the hub `setTrustedVault`
+
+3. MerkleRoot
+    3.1 Open (No permissions)
+    3.2 Restricted
+4. Set trustedRemote for the LayerZero Application on the dst chainId
+5. User deposit into origin (src) vault
+6. (As Admin) call deposit into Strategy
+7. (As XChainStrategy manager or strategist) call deposit assets to Chain, `hub::depositToChain`
+8. (Call swap) - tokens should appear on target/dst chain (query the USDC balance of the strategy)
 

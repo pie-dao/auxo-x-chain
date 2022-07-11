@@ -13,14 +13,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.12;
 
-import {XChainHub} from "../XChainHubAnyswap.sol";
+import {XChainStargateHub} from "../XChainStargateHub.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {BaseStrategy} from "./BaseStrategy.sol";
 
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-contract XChainStrategy is BaseStrategy {
+contract XChainStrategyStargate is BaseStrategy {
     using SafeERC20 for IERC20;
 
     // possible states:
@@ -35,10 +35,21 @@ contract XChainStrategy is BaseStrategy {
         WITHDRAWING
     }
 
-    struct DepositParams {
+    /// @dev this calls layerZero
+    struct WithdrawParams {
         uint16 dstChain;
         address dstVault;
         bytes adapterParams;
+        address payable refundAddress;
+    }
+
+    /// @dev this call stargate
+    struct DepositParams {
+        uint16 dstChain;
+        uint16 srcPoolId;
+        uint16 dstPoolId;
+        address dstHub;
+        address dstVault;
         address payable refundAddress;
     }
 
@@ -47,14 +58,14 @@ contract XChainStrategy is BaseStrategy {
         uint256 amountDeposited;
     }
 
-    XChainHub private hub;
+    XChainStargateHub private hub;
     DepositState public state;
     Deposit public xChainDeposit;
 
     uint256 public reportedUnderlying;
 
     constructor(
-        XChainHub hub_,
+        XChainStargateHub hub_,
         IVault vault_,
         IERC20 underlying_,
         address manager_,
@@ -69,7 +80,7 @@ contract XChainStrategy is BaseStrategy {
         uint256 amount,
         uint256 minAmount,
         DepositParams calldata params
-    ) external {
+    ) external payable {
         require(
             msg.sender == manager || msg.sender == strategist,
             "XChainStrategy: caller not authorized"
@@ -87,17 +98,24 @@ contract XChainStrategy is BaseStrategy {
         xChainDeposit.amountDeposited += amount;
 
         underlying.safeApprove(address(hub), amount);
-        hub.depositToChain(
+
+        /// @dev get the fees before sending
+        hub.depositToChain{value: msg.value}(
             params.dstChain,
+            params.srcPoolId,
+            params.dstPoolId,
+            params.dstHub,
             params.dstVault,
             amount,
             minAmount,
-            params.adapterParams,
             params.refundAddress
         );
     }
 
-    function withdrawUnderlying(uint256 amount) external {
+    function withdrawUnderlying(
+        uint256 amountVaultShares,
+        WithdrawParams memory params
+    ) external {
         require(
             msg.sender == manager || msg.sender == strategist,
             "XChainStrategy: caller not authorized"
@@ -110,17 +128,16 @@ contract XChainStrategy is BaseStrategy {
             "XChainStrategy: wrong state"
         );
 
-        DepositParams memory params = xChainDeposit.params;
-
         hub.withdrawFromChain(
             params.dstChain,
             params.dstVault,
-            amount,
+            amountVaultShares,
             params.adapterParams,
             params.refundAddress
         );
     }
 
+    /// @dev bug
     function estimatedUnderlying() external view override returns (uint256) {
         if (state == DepositState.NOT_DEPOSITED) {
             return float();

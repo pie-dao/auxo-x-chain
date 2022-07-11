@@ -1,34 +1,3 @@
-Skip to content
-Search or jump to…
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@jordaniza 
-jordaniza
-/
-auxo-x-chain
-Public
-forked from pie-dao/auxo-x-chain
-Code
-Pull requests
-1
-Actions
-Projects
-Wiki
-Security
-Insights
-Settings
-auxo-x-chain/src/XChainHub.sol
-@jordaniza
-jordaniza added prep docs for the stargate work
-Latest commit 7c69005 18 hours ago
- History
- 2 contributors
-@dantop114@jordaniza
-497 lines (416 sloc)  18.7 KB
-
 //   ______
 //  /      \
 // /$$$$$$  | __    __  __    __   ______
@@ -61,7 +30,7 @@ contract XChainHub is LayerZeroApp {
     /*///////////////////////////////////////////////////////////////
                             Action Enums
     //////////////////////////////////////////////////////////////*/
-    
+
     /// Enter into a vault
     uint8 internal constant DEPOSIT_ACTION = 0;
     /// Begin the batch burn process
@@ -77,7 +46,7 @@ contract XChainHub is LayerZeroApp {
 
     /// @notice Message struct
     /// @param action is the number of the action above
-    /// @param payload is the encoded data to be sent with the message 
+    /// @param payload is the encoded data to be sent with the message
     struct Message {
         uint8 action;
         bytes payload;
@@ -85,8 +54,8 @@ contract XChainHub is LayerZeroApp {
 
     /*///////////////////////////////////////////////////////////////
                         Constants & Immutables
-    //////////////////////////////////////////////////////////////*/    
-    
+    //////////////////////////////////////////////////////////////*/
+
     /// Report delay
     uint64 internal constant REPORT_DELAY = 6 hours;
 
@@ -96,7 +65,7 @@ contract XChainHub is LayerZeroApp {
 
     /*///////////////////////////////////////////////////////////////
                         Single Chain Mappings
-    //////////////////////////////////////////////////////////////*/    
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Trusted vaults on current chain.
     mapping(address => bool) public trustedVault;
@@ -171,14 +140,14 @@ contract XChainHub is LayerZeroApp {
 
     /*///////////////////////////////////////////////////////////////
                         Cross Chain Functions
-    //////////////////////////////////////////////////////////////*/    
+    //////////////////////////////////////////////////////////////*/
 
-    /// @notice iterates through a list of destination chains and sends the current value of 
+    /// @notice iterates through a list of destination chains and sends the current value of
     ///     the strategy (in terms of the underlying vault token) to that chain.
-    /// @param vault Vault on the current chain. 
+    /// @param vault Vault on the current chain.
     /// @param dstChains is an array of the layerZero chain Ids to check
     /// @param strats array of strategy addresses on the destination chains, index should match the dstChainId
-    /// @param adapterParams is additional info to send to the Lz receiver   
+    /// @param adapterParams is additional info to send to the Lz receiver
     /// @dev There are a few caveats:
     ///     1. All strategies must have deposits.
     ///     2. Requires that the setTrustedRemote method be set from lzApp, with the address being the deploy
@@ -232,7 +201,7 @@ contract XChainHub is LayerZeroApp {
         }
     }
 
-    /// @dev this looks like it completes the exit process but it's not 
+    /// @dev this looks like it completes the exit process but it's not
     ///     clear how that is useful in the context of rest of the contract
     function finalizeWithdrawFromVault(IVault vault) external onlyOwner {
         uint256 round = vault.batchBurnRound();
@@ -343,7 +312,7 @@ contract XChainHub is LayerZeroApp {
                                 Reducer
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice called by the Lz application on the dstChain, 
+    /// @notice called by the Lz application on the dstChain,
     ///         then executes the corresponding action.
     /// @param _srcChainId the layerZero chain id
     /// @param _srcAddress UNUSED PARAM
@@ -384,10 +353,9 @@ contract XChainHub is LayerZeroApp {
                             Action Functions
     //////////////////////////////////////////////////////////////*/
 
-
     /// @param _srcChainId what layerZero chainId was the request initiated from
     /// @param _payload abi encoded as follows:
-    ///     IVault 
+    ///     IVault
     ///     address (of strategy)
     ///     uint256 (amount to deposit)
     ///     uint256 (min amount of shares expected to be minted)
@@ -424,7 +392,7 @@ contract XChainHub is LayerZeroApp {
     /// @param _payload encoded in the format:
     ///     IVault
     ///     address (of strategy)
-    ///     uint256 (amount of auxo tokens to burn) 
+    ///     uint256 (amount of auxo tokens to burn)
     function _requestWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
     {
@@ -501,7 +469,6 @@ contract XChainHub is LayerZeroApp {
         uint256 strategyAmount = (amountPerShare * exitingShares) /
             (10**vault.decimals());
 
-
         // approve and swap the tokens
         // This might not work as I belive the anyswap router is expecting the address of an anyToken
         // which needs an `.underlying()` method to be defined
@@ -526,17 +493,3 @@ contract XChainHub is LayerZeroApp {
         strategy.report(amountToReport);
     }
 }
-Footer
-© 2022 GitHub, Inc.
-Footer navigation
-Terms
-Privacy
-Security
-Status
-Docs
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
