@@ -6,7 +6,8 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {XChainStargateHub} from "../src/XChainStargateHub.sol";
-import {XChainStargateHubMockReducer, XChainStargateHubMockLzSend, MockStargateRouter} from "./mocks/MockXChainStargateHub.sol";
+import {XChainStargateHubMockReducer, XChainStargateHubMockLzSend} from "./mocks/MockXChainStargateHub.sol";
+import {MockStargateRouter} from "./mocks/MockStargateRouter.sol";
 
 import {AuxoTest} from "./mocks/MockERC20.sol";
 import {MockVault} from "./mocks/MockVault.sol";
@@ -459,7 +460,7 @@ contract TestXChainStargateHub is Test {
         // deposit requires tokens
         token.transfer(trustedStrat, token.balanceOf(address(this)));
 
-        // approve hub to take my tokens
+        // approve hub to take tokens - checked that this is called in the strategy
         vm.prank(trustedStrat);
         token.approve(address(hubMockRouter), type(uint256).max);
 
@@ -490,6 +491,8 @@ contract TestXChainStargateHub is Test {
     }
 
     // REPORT UNDERLYING
+
+    function testReportUnderlying() public {}
 
     // test reverts if the vault is untrusted
     // test reverts if length mismatched

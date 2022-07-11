@@ -258,8 +258,8 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             _lzSend(
                 dstChains[i],
                 abi.encode(message),
-                payable(msg.sender), // refund to sender - do we need a refund address here
-                address(0),
+                payable(refundRecipient), // refund to sender - do we need a refund address here
+                address(0), // zro
                 adapterParams
             );
         }
@@ -305,7 +305,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             trustedStrategy[msg.sender],
-            "XChainHub::depositToChain:UNTRUSTED_STRATEGY"
+            "XChainHub::depositToChain:UNTRUSTED"
         );
 
         /// @dev remove variables in lexical scope to fix stack too deep err
@@ -399,7 +399,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ) external payable {
         require(
             trustedStrategy[msg.sender],
-            "XChainHub::finalizeWithdrawFromChain:UNTRUSTED_STRATEGY"
+            "XChainHub::finalizeWithdrawFromChain:UNTRUSTED"
         );
 
         IHubPayload.Message memory message = IHubPayload.Message({
@@ -617,7 +617,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         // TODO Test: Do we need to approve shares? I think so
         // will revert if amount is more than what we have.
-        vault.enterBatchBurn(amount);
+        vault.enterBatchBurn(amountVaultShares);
     }
 
     /// @notice calculate how much available to strategy based on existing shares and current batch burn round
