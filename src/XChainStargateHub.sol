@@ -50,8 +50,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     );
     event CrossChainReportUnderylingReceived(uint16 srcChainId, uint256 amount);
 
-    event CrossChainNoopReceived(uint16 _srcChainId);
-
     /// @dev some actions involve starge swaps while others involve lz messages
     ///     We can divide the uint8 range of 0 - 255 into 3 groups
     ///     0 - 85: Actions should only be triggered by LayerZero
@@ -76,10 +74,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// STARGATE ACTION::Enter into a vault
     uint8 public constant DEPOSIT_ACTION = 86;
-
-    // --------------------------
-    // Structs
-    // --------------------------
 
     // --------------------------
     // Constants & Immutables
@@ -553,7 +547,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_depositAction:UNTRUSTED"
         );
 
         IERC20 underlying = vault.underlying();
@@ -563,14 +557,14 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         underlying.safeApprove(address(vault), amount);
         vault.deposit(address(this), amount);
 
-        uint256 mintedShares = vault.balanceOf(address(this)) - vaultBalance;
+        // uint256 mintedShares = vault.balanceOf(address(this)) - vaultBalance;
 
-        require(
-            mintedShares >= payload.min,
-            "XChainHub: minted less shares than required"
-        );
+        // require(
+        //     mintedShares >= payload.min,
+        //     "XChainHub::_depositAction:INSUFFICIENT MINTED SHARES"
+        // );
 
-        sharesPerStrategy[_srcChainId][payload.strategy] += mintedShares;
+        // sharesPerStrategy[_srcChainId][payload.strategy] += mintedShares;
     }
 
     /// @notice enter the batch burn for a vault on the current chain
@@ -597,17 +591,17 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             trustedVault[address(vault)],
-            "XChainHub::_requestWithdrawAction vault is not trusted"
+            "XChainHub::_requestWithdrawAction:UNTRUSTED"
         );
 
         require(
             exiting[address(vault)],
-            "XChainHub::_requestWithdrawAction vault is not in exit window"
+            "XChainHub::_requestWithdrawAction:VAULT NOT EXITING"
         );
 
         require(
             currentRound == 0 || currentRound == round,
-            "XChainHub::_requestWithdrawAction strategy is already exiting from a previous round"
+            "XChainHub::_requestWithdrawAction:ROUNDS MISMATCHED"
         );
 
         // update the state before entering the burn
@@ -663,17 +657,17 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         require(
             !exiting[address(vault)],
-            "XChainHub::_finalizeWithdrawAction exit window is not closed."
+            "XChainHub::_finalizeWithdrawAction:EXITING"
         );
 
         require(
             trustedVault[address(vault)],
-            "XChainHub::_finalizeWithdrawAction vault is not trusted"
+            "XChainHub::_finalizeWithdrawAction:UNTRUSTED"
         );
 
         require(
             currentRoundPerStrategy[_srcChainId][strategy] > 0,
-            "XChainHub::_finalizeWithdrawAction no withdraws for strategy"
+            "XChainHub::_finalizeWithdrawAction:NO WITHDRAWS"
         );
 
         currentRoundPerStrategy[_srcChainId][strategy] = 0;
@@ -690,7 +684,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         /// @dev review and change minAmountOut and txParams before moving to production
         stargateRouter.swap{value: msg.value}(
-            // TODO Is this _srcChainId the same for Layer Zero and Stargate?
             _srcChainId, // send back to the source
             payload.srcPoolId,
             payload.dstPoolId,

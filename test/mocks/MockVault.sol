@@ -24,6 +24,49 @@ contract MockVault is ERC20 {
         expectedWithdrawal = shares * amountPerShare;
     }
 
+    function deposit(address to, uint256 underlyingAmount)
+        external
+        returns (uint256)
+    {
+        _deposit(
+            to,
+            (shares = calculateShares(underlyingAmount)),
+            underlyingAmount
+        );
+    }
+
+    function _deposit(
+        address to,
+        uint256 shares,
+        uint256 underlyingAmount
+    ) internal virtual whenNotPaused {
+        uint256 userUnderlying = calculateUnderlying(balanceOf(to)) +
+            underlyingAmount;
+        uint256 vaultUnderlying = totalUnderlying() + underlyingAmount;
+
+        require(
+            userUnderlying <= userDepositLimit,
+            "_deposit::USER_DEPOSIT_LIMITS_REACHED"
+        );
+        require(
+            vaultUnderlying <= vaultDepositLimit,
+            "_deposit::VAULT_DEPOSIT_LIMITS_REACHED"
+        );
+
+        // Determine te equivalent amount of shares and mint them
+        _mint(to, shares);
+
+        emit Deposit(msg.sender, to, underlyingAmount);
+
+        // Transfer in underlying tokens from the user.
+        // This will revert if the user does not have the amount specified.
+        underlying.safeTransferFrom(
+            msg.sender,
+            address(this),
+            underlyingAmount
+        );
+    }
+
     function exitBatchBurn() external {
         uint256 batchBurnRound_ = batchBurnRound;
         BatchBurnReceipt memory receipt = BatchBurnReceipt({

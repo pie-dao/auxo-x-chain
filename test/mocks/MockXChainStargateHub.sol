@@ -133,3 +133,16 @@ contract XChainStargateHubMockLzSend is XChainStargateHub {
         }
     }
 }
+
+/// @dev grant access to internal functions
+contract XChainStargateHubMockActions is XChainStargateHub {
+    constructor(
+        address _stargateEndpoint,
+        address _lzEndpoint,
+        address _refundRecipient
+    ) XChainStargateHub(_stargateEndpoint, _lzEndpoint, _refundRecipient) {}
+
+    function depositAction(uint16 _srcChainId, bytes memory _payload) external {
+        return _depositAction(_srcChainId, _payload);
+    }
+}

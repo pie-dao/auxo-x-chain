@@ -6,12 +6,12 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {XChainStargateHub} from "../src/XChainStargateHub.sol";
-import {XChainStargateHubMockReducer, XChainStargateHubMockLzSend} from "./mocks/MockXChainStargateHub.sol";
+import {XChainStargateHubMockReducer, XChainStargateHubMockLzSend, XChainStargateHubMockActions} from "./mocks/MockXChainStargateHub.sol";
 import {MockStargateRouter} from "./mocks/MockStargateRouter.sol";
 
 import {AuxoTest} from "./mocks/MockERC20.sol";
 import {MockVault} from "./mocks/MockVault.sol";
-import {LZEndpointMock} from "./mocks/MockLayerZeroEndpoint.sol";
+// import {LZEndpointMock} from "./mocks/MockLayerZeroEndpoint.sol";
 
 import {IStargateRouter} from "../src/interfaces/IStargateRouter.sol";
 import {IVault} from "../src/interfaces/IVault.sol";
@@ -32,7 +32,10 @@ contract TestXChainStargateHub is Test {
     address public vaultAddr;
     IVault public vault;
     XChainStargateHub public hub;
-    XChainStargateHubMockReducer hubMockReducer;
+    XChainStargateHubMockReducer public hubMockReducer;
+    XChainStargateHubMockActions public hubMockActions;
+    // random addr
+    address private stratAddr = 0x4A1c900Ee1042dC2BA405821F0ea13CfBADCAb7B;
 
     function setUp() public {
         vaultAddr = 0x4A1c900Ee1042dC2BA405821F0ea13CfBADCAb7B;
@@ -45,6 +48,7 @@ contract TestXChainStargateHub is Test {
         );
         hub = new XChainStargateHub(stargate, lz, refund);
         hubMockReducer = new XChainStargateHubMockReducer(stargate, lz, refund);
+        hubMockActions = new XChainStargateHubMockActions(stargate, lz, refund);
     }
 
     // test initial state of the contract
@@ -79,7 +83,7 @@ contract TestXChainStargateHub is Test {
         uint16[] memory dstChains = new uint16[](1);
         address[] memory strats = new address[](1);
         dstChains[0] = 1;
-        strats[0] = 0x4A1c900Ee1042dC2BA405821F0ea13CfBADCAb7B;
+        strats[0] = stratAddr;
 
         vm.startPrank(_notOwner);
         vm.expectRevert(onlyOwnerErr);
@@ -500,4 +504,66 @@ contract TestXChainStargateHub is Test {
     // test reverts if attempted before the timestamp has elapsed
     // test the mock was called with the correct message
     // test the latest update was set correctly for each chain
+
+    // testing destination-side functions
+    function testDepositAction() public {}
+
+    /// @notice some boilerplate for setting up a hub
+    function _initHubForDeposit(XChainStargateHub hub)
+        internal
+        returns (ERC20, MockVault)
+    {
+        // setup the token
+        ERC20 token = new AuxoTest();
+
+        // setup the mock vault
+        MockVault _vault = new MockVault(token);
+
+        // trust the vault
+        hub.setTrustedVault(address(_vault), true);
+
+        return (token, _vault);
+    }
+
+    function testDepositActionRevertsWithUntrustedVault(address _untrusted)
+        public
+    {
+        (, MockVault _vault) = _initHubForDeposit(hubMockActions);
+        vm.assume(_untrusted != address(_vault));
+
+        bytes memory payload = abi.encode(
+            IHubPayload.DepositPayload({
+                vault: _untrusted,
+                strategy: stratAddr,
+                amountUnderyling: 1e20,
+                min: 9e19
+            })
+        );
+
+        vm.expectRevert("XChainHub::_depositAction:UNTRUSTED");
+        hubMockActions.depositAction(1, payload);
+    }
+
+    function testDepositActionRevertsWithInsufficientMint() public {
+        (ERC20 token, MockVault _vault) = _initHubForDeposit(hubMockActions);
+
+        uint256 balance = token.balanceOf(address(this));
+
+        bytes memory payload = abi.encode(
+            IHubPayload.DepositPayload({
+                vault: address(_vault),
+                strategy: stratAddr,
+                amountUnderyling: balance,
+                min: (balance * 99) / 100
+            })
+        );
+
+        token.transfer(address(hubMockActions), token.balanceOf(address(this)));
+
+        uint256 balanceHub = token.balanceOf(address(hubMockActions));
+
+        console.log(balance, balanceHub);
+
+        hubMockActions.depositAction(1, payload);
+    }
 }
