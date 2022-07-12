@@ -145,4 +145,34 @@ contract XChainStargateHubMockActions is XChainStargateHub {
     function depositAction(uint16 _srcChainId, bytes memory _payload) external {
         return _depositAction(_srcChainId, _payload);
     }
+
+    function requestWithdrawAction(uint16 _srcChainId, bytes memory _payload)
+        external
+    {
+        _requestWithdrawAction(_srcChainId, _payload);
+    }
+
+    function setCurrentRoundPerStrategy(
+        uint16 _srcChainId,
+        address _strategy,
+        uint256 _round
+    ) external {
+        currentRoundPerStrategy[_srcChainId][_strategy] = _round;
+    }
+
+    function setSharesPerStrategy(
+        uint16 _srcChainId,
+        address _strategy,
+        uint256 _shares
+    ) external {
+        sharesPerStrategy[_srcChainId][_strategy] = _shares;
+    }
+
+    function setExitingSharesPerStrategy(
+        uint16 _srcChainId,
+        address _strategy,
+        uint256 _shares
+    ) external {
+        exitingSharesPerStrategy[_srcChainId][_strategy] = _shares;
+    }
 }

@@ -13,17 +13,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.12;
 
-import {Ownable} from "openzeppelin/access/Ownable.sol";
-import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
-import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@oz/access/Ownable.sol";
+import {IERC20} from "@oz/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@oz/token/ERC20/utils/SafeERC20.sol";
 
-import {IVault} from "./interfaces/IVault.sol";
-import {IHubPayload} from "./interfaces/IHubPayload.sol";
-import {IStrategy} from "./interfaces/IStrategy.sol";
+import {IVault} from "@interfaces/IVault.sol";
+import {IHubPayload} from "@interfaces/IHubPayload.sol";
+import {IStrategy} from "@interfaces/IStrategy.sol";
 
 import {LayerZeroApp} from "./LayerZeroApp.sol";
-import {IStargateReceiver} from "./interfaces/IStargateReceiver.sol";
-import {IStargateRouter} from "./interfaces/IStargateRouter.sol";
+import {IStargateReceiver} from "@interfaces/IStargateReceiver.sol";
+import {IStargateRouter} from "@interfaces/IStargateRouter.sol";
 
 /// @title XChainHub
 /// @dev Expect this contract to change in future.
@@ -557,14 +557,14 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         underlying.safeApprove(address(vault), amount);
         vault.deposit(address(this), amount);
 
-        // uint256 mintedShares = vault.balanceOf(address(this)) - vaultBalance;
+        uint256 mintedShares = vault.balanceOf(address(this)) - vaultBalance;
 
-        // require(
-        //     mintedShares >= payload.min,
-        //     "XChainHub::_depositAction:INSUFFICIENT MINTED SHARES"
-        // );
+        require(
+            mintedShares >= payload.min,
+            "XChainHub::_depositAction:INSUFFICIENT MINTED SHARES"
+        );
 
-        // sharesPerStrategy[_srcChainId][payload.strategy] += mintedShares;
+        sharesPerStrategy[_srcChainId][payload.strategy] += mintedShares;
     }
 
     /// @notice enter the batch burn for a vault on the current chain
@@ -602,6 +602,13 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         require(
             currentRound == 0 || currentRound == round,
             "XChainHub::_requestWithdrawAction:ROUNDS MISMATCHED"
+        );
+
+        // TODO Need to confirm how this all works with amountVaultShares > sharesPerStrategy
+        // In theory this shouldn't happen...
+        require(
+            sharesPerStrategy[_srcChainId][strategy] >= amountVaultShares,
+            "XChainHub::_requestWithdrawAction:INSUFFICIENT SHARES"
         );
 
         // update the state before entering the burn
