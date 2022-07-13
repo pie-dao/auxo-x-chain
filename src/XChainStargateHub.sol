@@ -52,15 +52,15 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @dev some actions involve starge swaps while others involve lz messages
     ///     We can divide the uint8 range of 0 - 255 into 3 groups
-    ///     0 - 85: Actions should only be triggered by LayerZero
-    ///     86 - 171: Actions should only be triggered by sgReceive
-    ///     172 - 255: Actions can be triggered by either
+    ///        - 0 - 85: Actions should only be triggered by LayerZero
+    ///        - 86 - 171: Actions should only be triggered by sgReceive
+    ///        - 172 - 255: Actions can be triggered by either
     ///     This allows us to extend actions in the future within a reserved namespace
     ///     but also allows for an easy check to see if actions are valid depending on the
     ///     entrypoint
 
     // --------------------------
-    //     Actions Reducer
+    // Actions
     // --------------------------
     uint8 public constant LAYER_ZERO_MAX_VALUE = 85;
     uint8 public constant STARGATE_MAX_VALUE = 171;
@@ -246,9 +246,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
                 )
             });
 
-            // See Layer zero docs for details on _lzSend
-            // Corrolary method is _nonblockingLzReceive which will be invoked
-            //      on the destination chain
+            // _nonblockingLzReceive will be invoked on dst chain
             _lzSend(
                 dstChains[i],
                 abi.encode(message),
@@ -465,7 +463,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     /// @dev invoked when IStargateRouter.swap is called
     /// @param _srcChainId layerzero chain id on src
     /// @param _srcAddress inital sender of the tx on src chain
-    /// @param _payload encoded payload data
+    /// @param _payload encoded payload data as IHubPayload.Message
     function sgReceive(
         uint16 _srcChainId,
         bytes memory _srcAddress,
@@ -528,11 +526,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     // --------------------------
 
     /// @param _srcChainId what layerZero chainId was the request initiated from
-    /// @param _payload abi encoded as follows:
-    ///     IVault
-    ///     address (of strategy)
-    ///     uint256 (amount to deposit)
-    ///     uint256 (min amount of shares expected to be minted)
+    /// @param _payload abi encoded as IHubPayload.DepositPayload
     function _depositAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
@@ -569,10 +563,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice enter the batch burn for a vault on the current chain
     /// @param _srcChainId layerZero chain id where the request originated
-    /// @param _payload encoded in the format:
-    ///     IVault
-    ///     address (of strategy)
-    ///     uint256 (amount of auxo tokens to burn)
+    /// @param _payload abi encoded as IHubPayload.RequestWithdrawPayload
     function _requestWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
@@ -647,11 +638,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice executes a withdrawal of underlying tokens from a vault to a strategy on the source chain
     /// @param _srcChainId what layerZero chainId was the request initiated from
-    /// @param _payload abi encoded as follows:
-    ///    IVault
-    ///    address (of strategy)
-    ///    uint16 (source stargate pool Id)
-    ///    uint16 (dest stargate pool Id)
+    /// @param _payload abi encoded as IHubPayload.FinalizeWithdrawPayload
     function _finalizeWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
