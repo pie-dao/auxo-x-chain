@@ -135,8 +135,13 @@ contract XChainStargateHubMockLzSend is XChainStargateHub {
     }
 }
 
-/// @dev grant access to internal functions
+/// @dev grant access to internal functions - also overrides layerzero
 contract XChainStargateHubMockActions is XChainStargateHub {
+    bytes[] public payloads;
+    address payable[] public refundAddresses;
+    address[] public zroPaymentAddresses;
+    bytes[] public adapterParams;
+
     constructor(
         address _stargateEndpoint,
         address _lzEndpoint,
@@ -194,5 +199,53 @@ contract XChainStargateHubMockActions is XChainStargateHub {
 
     function reportUnderlyingAction(bytes memory _payload) external {
         _reportUnderlyingAction(_payload);
+    }
+
+    function setLatestReport(
+        uint16 chainId,
+        address strategy,
+        uint256 timestamp
+    ) external {
+        latestUpdate[chainId][strategy] = timestamp;
+    }
+
+    /// @notice intercept the layerZero send and log the outgoing request
+    function _lzSend(
+        uint16 _dstChainId,
+        bytes memory _payload,
+        address payable _refundAddress,
+        address _zroPaymentAddress,
+        bytes memory _adapterParams
+    ) internal override {
+        bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
+
+        require(
+            trustedRemote.length != 0,
+            "LayerZeroApp: destination chain is not a trusted source"
+        );
+
+        if (payloads.length == 0) {
+            payloads = [_payload];
+        } else {
+            payloads.push(_payload);
+        }
+
+        if (refundAddresses.length == 0) {
+            refundAddresses = [_refundAddress];
+        } else {
+            refundAddresses.push(_refundAddress);
+        }
+
+        if (adapterParams.length == 0) {
+            adapterParams = [_adapterParams];
+        } else {
+            adapterParams.push(_adapterParams);
+        }
+
+        if (zroPaymentAddresses.length == 0) {
+            zroPaymentAddresses = [_zroPaymentAddress];
+        } else {
+            zroPaymentAddresses.push(_zroPaymentAddress);
+        }
     }
 }

@@ -26,6 +26,8 @@ contract TestXChainStargateHubSrc is Test {
     address public vaultAddr;
     IVault public vault;
     XChainStargateHub public hub;
+    address[] public strategies;
+    uint16[] public dstChains;
     // random addr
     address private stratAddr = 0x4A1c900Ee1042dC2BA405821F0ea13CfBADCAb7B;
 
@@ -388,13 +390,139 @@ contract TestXChainStargateHubSrc is Test {
     }
 
     // REPORT UNDERLYING
+    function testReportUnderlyingRevertsIfUntrusted(address _vault) public {
+        vm.assume(_vault != vaultAddr);
 
-    function testReportUnderlying() public {}
+        strategies.push(stratAddr);
+        dstChains.push(1);
 
-    // test reverts if the vault is untrusted
-    // test reverts if length mismatched
-    // test reverts if one of the strategies has no deposits
-    // test reverts if attempted before the timestamp has elapsed
+        hub.setTrustedVault(vaultAddr, true);
+
+        vm.expectRevert(bytes("XChainHub::reportUnderlying:UNTRUSTED"));
+        hub.reportUnderlying(IVault(_vault), dstChains, strategies, bytes(""));
+    }
+
+    function testReportUnderlyingRevertsIfLengthMismatch(
+        bool chainsLongerThanStrats
+    ) public {
+        strategies.push(stratAddr);
+        dstChains.push(1);
+        chainsLongerThanStrats ? dstChains.push(2) : strategies.push(stratAddr);
+
+        hub.setTrustedVault(vaultAddr, true);
+
+        vm.expectRevert(bytes("XChainHub::reportUnderlying:LENGTH MISMATCH"));
+        hub.reportUnderlying(
+            IVault(vaultAddr),
+            dstChains,
+            strategies,
+            bytes("")
+        );
+    }
+
+    function testReportUnderlyingRevertsIfFirstStratHasNoDeposits() public {
+        ERC20 token = new AuxoTest();
+        MockVault vault = new MockVault(token);
+        XChainStargateHubMockActions _hub = new XChainStargateHubMockActions(
+            stargate,
+            lz,
+            refund
+        );
+
+        strategies.push(stratAddr);
+        dstChains.push(1);
+
+        _hub.setTrustedVault(address(vault), true);
+
+        vm.expectRevert(bytes("XChainHub::reportUnderlying:NO DEPOSITS"));
+        _hub.reportUnderlying(
+            IVault(address(vault)),
+            dstChains,
+            strategies,
+            bytes("")
+        );
+    }
+
+    function testReportUnderlyingRevertsIfFirstStratIsTooRecent() public {
+        ERC20 token = new AuxoTest();
+        MockVault vault = new MockVault(token);
+        XChainStargateHubMockActions _hub = new XChainStargateHubMockActions(
+            stargate,
+            lz,
+            refund
+        );
+
+        strategies.push(stratAddr);
+        dstChains.push(1);
+
+        _hub.setTrustedVault(address(vault), true);
+        _hub.setSharesPerStrategy(dstChains[0], strategies[0], 1e21);
+
+        vm.expectRevert(bytes("XChainHub::reportUnderlying:TOO RECENT"));
+        _hub.reportUnderlying(
+            IVault(address(vault)),
+            dstChains,
+            strategies,
+            bytes("")
+        );
+    }
+
+    function testReportUnderlying1Strat() public {
+        ERC20 token = new AuxoTest();
+        MockVault vault = new MockVault(token);
+        XChainStargateHubMockActions _hub = new XChainStargateHubMockActions(
+            stargate,
+            lz,
+            refund
+        );
+
+        strategies.push(stratAddr);
+        dstChains.push(1);
+
+        uint256 shares = 1e21;
+
+        _hub.setTrustedVault(address(vault), true);
+        _hub.setSharesPerStrategy(dstChains[0], strategies[0], shares);
+        _hub.setLatestReport(dstChains[0], strategies[0], block.timestamp);
+
+        // report delay is 6 hours
+        vm.warp(block.timestamp + 6 hours);
+
+        // set layerzero boilerplate
+        _hub.setTrustedRemote(dstChains[0], abi.encodePacked(address(_hub)));
+
+        _hub.reportUnderlying(
+            IVault(address(vault)),
+            dstChains,
+            strategies,
+            bytes("")
+        );
+
+        // the mock intercepts and stores payloads that we can inspect
+        bytes memory payload = _hub.payloads(0);
+
+        // decode the outer message
+        IHubPayload.Message memory message = abi.decode(
+            payload,
+            (IHubPayload.Message)
+        );
+
+        // decode the inner payload
+        IHubPayload.ReportUnderlyingPayload memory decoded = abi.decode(
+            message.payload,
+            (IHubPayload.ReportUnderlyingPayload)
+        );
+
+        uint256 expectedAmountReported = (vault.exchangeRate() * shares) /
+            (10**18);
+
+        // run through relevant calldata
+        assertEq(message.action, hub.REPORT_UNDERLYING_ACTION());
+        assertEq(decoded.strategy, strategies[0]);
+        assertEq(decoded.amountToReport, expectedAmountReported);
+        assertEq(_hub.refundAddresses(0), refund);
+    }
+
     // test the mock was called with the correct message
     // test the latest update was set correctly for each chain
 }

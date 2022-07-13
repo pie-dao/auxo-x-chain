@@ -90,7 +90,7 @@ Currently, the hub utilises the [Anyswap router](https://github.com/anyswap/Cros
 - [x] Define the unit test suite
 - [x] Build integration test scripts for the testnets
 - [ ] Unit testing on src
-- [ ] Unit testing on dst
+- [x] Unit testing on dst
 - [ ] Unit testing cross chain with mocks
 - [ ] Completed Integration testing
 

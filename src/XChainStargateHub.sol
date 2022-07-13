@@ -209,12 +209,12 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ) external payable onlyOwner {
         require(
             trustedVault[address(vault)],
-            "XChainHub::reportUnderying:UNTRUSTED"
+            "XChainHub::reportUnderlying:UNTRUSTED"
         );
 
         require(
             dstChains.length == strats.length,
-            "XChainHub::reportUnderying:LENGTH MISMATCH"
+            "XChainHub::reportUnderlying:LENGTH MISMATCH"
         );
 
         uint256 amountToReport;
@@ -223,12 +223,12 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         for (uint256 i; i < dstChains.length; i++) {
             uint256 shares = sharesPerStrategy[dstChains[i]][strats[i]];
 
-            require(shares > 0, "XChainHub::reportUnderying:NO DEPOSITS");
+            require(shares > 0, "XChainHub::reportUnderlying:NO DEPOSITS");
 
             require(
-                latestUpdate[dstChains[i]][strats[i]] >=
-                    (block.timestamp + REPORT_DELAY),
-                "XChainHub::TOO RECENT"
+                block.timestamp >=
+                    latestUpdate[dstChains[i]][strats[i]] + REPORT_DELAY,
+                "XChainHub::reportUnderlying:TOO RECENT"
             );
 
             // record the latest update for future reference
