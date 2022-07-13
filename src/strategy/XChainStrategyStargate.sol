@@ -133,7 +133,7 @@ contract XChainStrategyStargate is BaseStrategy {
             "XChainStrategy: wrong state"
         );
 
-        hub.withdrawFromChain(
+        hub.requestWithdrawFromChain(
             params.dstChain,
             params.dstVault,
             amountVaultShares,

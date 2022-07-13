@@ -5,10 +5,15 @@ pragma solidity 0.8.12;
 
 import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-/// @title XChainHub
-/// @dev Expect this contract to change in future.
 contract AuxoTest is ERC20 {
     constructor() ERC20("AuxoTest", "TST") {
+        _mint(msg.sender, 1e27);
+    }
+}
+
+contract AuxoTestDecimals is ERC20 {
+    constructor(uint8 _decimals) ERC20("AuxoTest", "TST") {
+        // _setupDecimals(_decimals);
         _mint(msg.sender, 1e27);
     }
 }

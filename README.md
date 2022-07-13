@@ -66,53 +66,36 @@ Currently, the hub utilises the [Anyswap router](https://github.com/anyswap/Cros
 - Anyswap supports a much larger array of tokens, whereas stargate only implements a few stables and Eth. 
 
 
-## Implementing Stargate To Do List
---------
-*This is a development reference only*
-
-Our to do list to swap out AnySwap/LayerZero with Stargate is as follows:
-
-- [x] Add the `IStargateRouter` to the list of interfaces
-- [x] Replace the AnySwap swaps with `IStargateRouter.swap`
-    - [x] `_finalizeWithdrawAction`
-    - [x] `constructor`
-    - [x] `depositToChain`
-
-- [x] Replace* the `_lzSend` messages with encoded payloads in `IStargateRouter.swap`
-    - [x] `depositToChain`
-
-- [x] Keep _lzSend in:
-    - [x] `reportUnderlying`
-    - [x] `finalizeWithdrawFromChain`
-
 ## Known set of implementation tasks to work on:
 - [ ] Implement events at different stages of the contract
 - [x] Remove the NI error if we don't need it
-- [ ] Confirm the Noop action with Team
 - [ ] Connect finalizeWithdrawFromVault to a cross chain action
 - [ ] Confirm that finalizeWithdrawFromVault is a step in _finalizeWithdrawAction
-- [ ] Ensure the format of messages in `sgReceive` matches the encoding in `IStargateRouter.swap` - currently in format `encoded(Message(, encoded(payload)))`
-    - [ ] Pass all payloads a Message structs
-    - [ ] Check encodings, in particular encoding IVaults and IStrategies
-    - [ ] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
+- [x] Ensure the format of messages in `sgReceive` matches the encoding in `IStargateRouter.swap` - currently in format `encoded(Message(, encoded(payload)))`
+    - [x] Pass all payloads a Message structs
+    - [x] Check encodings, in particular encoding IVaults and IStrategies
+    - [x] Consider defining structs for all payloads to ensure consistent serialisation and deserialisation
 - [x] See if the reducers can be combined by passing the payloads from both entrypoints
 - [ ] Confirm the params for both stargate swaps:
     - [ ] default lzTxObj
-    - [ ] minAmountOut
-    - [ ] destination (strategy?)
+    - [x] minAmountOut
+    - [x] destination (strategy?)
 - [ ] Refactoring: start to break down some of the larger functions into smaller chunks
 
 
 ## Testing
-- [ ] Setup the mocks:
-    - [ ] LayerZero
-    - [ ] Stargate
-- [ ] Define the unit test suite
-- [ ] Build integration test scripts for the testnets
-
-
+- [x] Setup the mocks:
+    - [x] LayerZero
+    - [x] Stargate
+- [x] Define the unit test suite
+- [x] Build integration test scripts for the testnets
+- [ ] Unit testing on src
+- [x] Unit testing on dst
+- [ ] Unit testing cross chain with mocks
+- [ ] Completed Integration testing
 
 # Deployment
+Deployment scripts are in the scripts folder, as of right now we have a large part of the vault scripts in the [Auxo Vaults Repo](https://github.com/pie-dao/auxo-vaults/tree/main), there is a pending task to create a unified deployer.
 
 # Deploying a Cross Chain Application
 

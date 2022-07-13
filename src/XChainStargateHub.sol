@@ -13,16 +13,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.12;
 
-import {Ownable} from "openzeppelin/access/Ownable.sol";
-import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
-import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@oz/access/Ownable.sol";
+import {IERC20} from "@oz/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@oz/token/ERC20/utils/SafeERC20.sol";
 
-import {IVault} from "./interfaces/IVault.sol";
+import {IVault} from "@interfaces/IVault.sol";
+import {IHubPayload} from "@interfaces/IHubPayload.sol";
+import {IStrategy} from "@interfaces/IStrategy.sol";
+
 import {LayerZeroApp} from "./LayerZeroApp.sol";
-import {IStrategy} from "./interfaces/IStrategy.sol";
-
-import {IStargateReceiver} from "./interfaces/IStargateReceiver.sol";
-import {IStargateRouter} from "./interfaces/IStargateRouter.sol";
+import {IStargateReceiver} from "@interfaces/IStargateReceiver.sol";
+import {IStargateRouter} from "@interfaces/IStargateRouter.sol";
 
 /// @title XChainHub
 /// @dev Expect this contract to change in future.
@@ -49,21 +50,18 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     );
     event CrossChainReportUnderylingReceived(uint16 srcChainId, uint256 amount);
 
-    event CrossChainNoopReceived(uint16 _srcChainId);
-
-    // --------------------------
-    // Action Enums
-    // --------------------------
-
     /// @dev some actions involve starge swaps while others involve lz messages
     ///     We can divide the uint8 range of 0 - 255 into 3 groups
-    ///     0 - 85: Actions should only be triggered by LayerZero
-    ///     86 - 171: Actions should only be triggered by sgReceive
-    ///     172 - 255: Actions can be triggered by either
+    ///        - 0 - 85: Actions should only be triggered by LayerZero
+    ///        - 86 - 171: Actions should only be triggered by sgReceive
+    ///        - 172 - 255: Actions can be triggered by either
     ///     This allows us to extend actions in the future within a reserved namespace
     ///     but also allows for an easy check to see if actions are valid depending on the
     ///     entrypoint
 
+    // --------------------------
+    // Actions
+    // --------------------------
     uint8 public constant LAYER_ZERO_MAX_VALUE = 85;
     uint8 public constant STARGATE_MAX_VALUE = 171;
 
@@ -76,47 +74,6 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// STARGATE ACTION::Enter into a vault
     uint8 public constant DEPOSIT_ACTION = 86;
-
-    // --------------------------
-    // Structs
-    // --------------------------
-
-    /// @notice Message struct
-    /// @param action is the number of the action above
-    /// @param payload is the encoded data to be sent with the message
-    struct Message {
-        uint8 action;
-        bytes payload;
-    }
-
-    /// @dev I had an idea to use structs as tools on either side of cross
-    ///      chain functions to serialise and deserialise messages, using a shared
-    ///      structure. Hopefully this would reduce errors.
-    struct DepositPayload {
-        IVault vault;
-        address strategy;
-        uint256 amount;
-        uint256 min;
-    }
-
-    struct FinalizeWithdrawPayload {
-        IVault vault;
-        address strategy;
-        uint16 srcPoolId;
-        uint16 dstPoolId;
-        uint256 minOutUnderlying;
-    }
-
-    struct RequestWithdrawPayload {
-        IVault vault;
-        address strategy;
-        uint256 amount;
-    }
-
-    struct ReportUnderlyingPayload {
-        IStrategy strategy;
-        uint256 amountToReport;
-    }
 
     // --------------------------
     // Constants & Immutables
@@ -252,12 +209,12 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ) external payable onlyOwner {
         require(
             trustedVault[address(vault)],
-            "XChainHub::reportUnderying:UNTRUSTED"
+            "XChainHub::reportUnderlying:UNTRUSTED"
         );
 
         require(
             dstChains.length == strats.length,
-            "XChainHub::reportUnderying:LENGTH MISMATCH"
+            "XChainHub::reportUnderlying:LENGTH MISMATCH"
         );
 
         uint256 amountToReport;
@@ -266,12 +223,12 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         for (uint256 i; i < dstChains.length; i++) {
             uint256 shares = sharesPerStrategy[dstChains[i]][strats[i]];
 
-            require(shares > 0, "XChainHub::reportUnderying:NO DEPOSITS");
+            require(shares > 0, "XChainHub::reportUnderlying:NO DEPOSITS");
 
             require(
-                latestUpdate[dstChains[i]][strats[i]] >=
-                    (block.timestamp + REPORT_DELAY),
-                "XChainHub::TOO RECENT"
+                block.timestamp >=
+                    latestUpdate[dstChains[i]][strats[i]] + REPORT_DELAY,
+                "XChainHub::reportUnderlying:TOO RECENT"
             );
 
             // record the latest update for future reference
@@ -279,19 +236,22 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
             amountToReport = (shares * exchangeRate) / 10**vault.decimals();
 
-            Message memory message = Message({
+            IHubPayload.Message memory message = IHubPayload.Message({
                 action: REPORT_UNDERLYING_ACTION,
-                payload: abi.encode(strats[i], amountToReport)
+                payload: abi.encode(
+                    IHubPayload.ReportUnderlyingPayload({
+                        strategy: strats[i],
+                        amountToReport: amountToReport
+                    })
+                )
             });
 
-            // See Layer zero docs for details on _lzSend
-            // Corrolary method is _nonblockingLzReceive which will be invoked
-            //      on the destination chain
+            // _nonblockingLzReceive will be invoked on dst chain
             _lzSend(
                 dstChains[i],
                 abi.encode(message),
-                payable(msg.sender), // refund to sender - do we need a refund address here
-                address(0),
+                payable(refundRecipient), // refund to sender - do we need a refund address here
+                address(0), // zro
                 adapterParams
             );
         }
@@ -307,6 +267,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         underlying.safeApprove(address(stargateRouter), _amount);
     }
 
+    /// @dev Only Called by the Cross Chain Strategy
     /// @notice makes a deposit of the underyling token into the vault on a given chain
     /// @param _dstChainId the layerZero chain id
     /// @param _srcPoolId https://stargateprotocol.gitbook.io/stargate/developers/pool-ids
@@ -321,7 +282,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         uint16 _dstChainId,
         uint16 _srcPoolId,
         uint16 _dstPoolId,
-        address _dstHub, // we also need the destination hub
+        address _dstHub,
         address _dstVault,
         uint256 _amount,
         uint256 _minOut,
@@ -342,16 +303,23 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         /// @dev remove variables in lexical scope to fix stack too deep err
         _approveRouterTransfer(msg.sender, _amount);
 
-        Message memory message = Message({
+        IHubPayload.Message memory message = IHubPayload.Message({
             action: DEPOSIT_ACTION,
-            payload: abi.encode(_dstVault, msg.sender, _amount, _minOut)
+            payload: abi.encode(
+                IHubPayload.DepositPayload({
+                    vault: _dstVault,
+                    strategy: msg.sender,
+                    amountUnderyling: _amount,
+                    min: _minOut
+                })
+            )
         });
 
         stargateRouter.swap{value: msg.value}(
             _dstChainId,
             _srcPoolId,
             _dstPoolId,
-            _refundAddress, // refunds sent to sender
+            _refundAddress, // refunds sent to operator
             _amount,
             _minOut,
             IStargateRouter.lzTxObj(200000, 0, "0x"), /// @dev review this default value
@@ -371,7 +339,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     /// @param amountVaultShares the number of auxovault shares to burn for underlying
     /// @param adapterParams additional layerZero config to pass
     /// @param refundAddress addrss on the source chain to send rebates to
-    function withdrawFromChain(
+    function requestWithdrawFromChain(
         uint16 dstChainId,
         address dstVault,
         uint256 amountVaultShares,
@@ -380,19 +348,25 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     ) external payable {
         require(
             trustedStrategy[msg.sender],
-            "XChainHub::withdrawFromChain:UNTRUSTED"
+            "XChainHub::requestWithdrawFromChain:UNTRUSTED"
         );
 
-        Message memory message = Message({
+        IHubPayload.Message memory message = IHubPayload.Message({
             action: REQUEST_WITHDRAW_ACTION,
-            payload: abi.encode(dstVault, msg.sender, amountVaultShares)
+            payload: abi.encode(
+                IHubPayload.RequestWithdrawPayload({
+                    vault: dstVault,
+                    strategy: msg.sender,
+                    amountVaultShares: amountVaultShares
+                })
+            )
         });
 
         _lzSend(
             dstChainId,
             abi.encode(message),
             refundAddress,
-            address(0),
+            address(0), // the address of the ZRO token holder who would pay for the transaction
             adapterParams
         );
     }
@@ -420,14 +394,16 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             "XChainHub::finalizeWithdrawFromChain:UNTRUSTED"
         );
 
-        Message memory message = Message({
+        IHubPayload.Message memory message = IHubPayload.Message({
             action: FINALIZE_WITHDRAW_ACTION,
             payload: abi.encode(
-                dstVault,
-                msg.sender,
-                srcPoolId,
-                dstPoolId,
-                minOutUnderlying
+                IHubPayload.FinalizeWithdrawPayload({
+                    vault: dstVault,
+                    strategy: msg.sender,
+                    srcPoolId: srcPoolId,
+                    dstPoolId: dstPoolId,
+                    minOutUnderlying: minOutUnderlying
+                })
             )
         });
 
@@ -452,7 +428,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     function _reducer(
         uint16 _srcChainId,
         bytes memory _srcAddress,
-        Message memory message
+        IHubPayload.Message memory message
     ) internal {
         require(
             msg.sender == address(this) ||
@@ -487,7 +463,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     /// @dev invoked when IStargateRouter.swap is called
     /// @param _srcChainId layerzero chain id on src
     /// @param _srcAddress inital sender of the tx on src chain
-    /// @param _payload encoded payload data
+    /// @param _payload encoded payload data as IHubPayload.Message
     function sgReceive(
         uint16 _srcChainId,
         bytes memory _srcAddress,
@@ -502,7 +478,10 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         );
 
         if (_payload.length > 0) {
-            Message memory message = abi.decode(_payload, (Message));
+            IHubPayload.Message memory message = abi.decode(
+                _payload,
+                (IHubPayload.Message)
+            );
 
             // actions 0 - 85 cannot be initiated through sgReceive
             require(
@@ -526,7 +505,10 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         bytes memory _payload
     ) internal virtual override {
         if (_payload.length > 0) {
-            Message memory message = abi.decode(_payload, (Message));
+            IHubPayload.Message memory message = abi.decode(
+                _payload,
+                (IHubPayload.Message)
+            );
 
             // actions 86 - 171 cannot be initiated through layerzero
             require(
@@ -544,21 +526,22 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     // --------------------------
 
     /// @param _srcChainId what layerZero chainId was the request initiated from
-    /// @param _payload abi encoded as follows:
-    ///     IVault
-    ///     address (of strategy)
-    ///     uint256 (amount to deposit)
-    ///     uint256 (min amount of shares expected to be minted)
+    /// @param _payload abi encoded as IHubPayload.DepositPayload
     function _depositAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
     {
-        (IVault vault, address strategy, uint256 amount, uint256 min) = abi
-            .decode(_payload, (IVault, address, uint256, uint256));
+        IHubPayload.DepositPayload memory payload = abi.decode(
+            _payload,
+            (IHubPayload.DepositPayload)
+        );
+
+        IVault vault = IVault(payload.vault);
+        uint256 amount = payload.amountUnderyling;
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_depositAction:UNTRUSTED"
         );
 
         IERC20 underlying = vault.underlying();
@@ -571,52 +554,64 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         uint256 mintedShares = vault.balanceOf(address(this)) - vaultBalance;
 
         require(
-            mintedShares >= min,
-            "XChainHub: minted less shares than required"
+            mintedShares >= payload.min,
+            "XChainHub::_depositAction:INSUFFICIENT MINTED SHARES"
         );
 
-        sharesPerStrategy[_srcChainId][strategy] += mintedShares;
+        sharesPerStrategy[_srcChainId][payload.strategy] += mintedShares;
     }
 
     /// @notice enter the batch burn for a vault on the current chain
     /// @param _srcChainId layerZero chain id where the request originated
-    /// @param _payload encoded in the format:
-    ///     IVault
-    ///     address (of strategy)
-    ///     uint256 (amount of auxo tokens to burn)
+    /// @param _payload abi encoded as IHubPayload.RequestWithdrawPayload
     function _requestWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
     {
-        (IVault vault, address strategy, uint256 amount) = abi.decode(
+        IHubPayload.RequestWithdrawPayload memory decoded = abi.decode(
             _payload,
-            (IVault, address, uint256)
+            (IHubPayload.RequestWithdrawPayload)
         );
+
+        IVault vault = IVault(decoded.vault);
+        address strategy = decoded.strategy;
+        uint256 amountVaultShares = decoded.amountVaultShares;
 
         uint256 round = vault.batchBurnRound();
         uint256 currentRound = currentRoundPerStrategy[_srcChainId][strategy];
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_requestWithdrawAction:UNTRUSTED"
         );
 
         require(
             exiting[address(vault)],
-            "XChainHub: vault is not in exit window"
+            "XChainHub::_requestWithdrawAction:VAULT NOT EXITING"
         );
 
         require(
             currentRound == 0 || currentRound == round,
-            "XChainHub: strategy is already exiting from a previous round"
+            "XChainHub::_requestWithdrawAction:ROUNDS MISMATCHED"
+        );
+
+        // TODO Need to confirm how this all works with amountVaultShares > sharesPerStrategy
+        // In theory this shouldn't happen...
+        require(
+            sharesPerStrategy[_srcChainId][strategy] >= amountVaultShares,
+            "XChainHub::_requestWithdrawAction:INSUFFICIENT SHARES"
         );
 
         // update the state before entering the burn
         currentRoundPerStrategy[_srcChainId][strategy] = round;
-        sharesPerStrategy[_srcChainId][strategy] -= amount;
-        exitingSharesPerStrategy[_srcChainId][strategy] += amount;
+        sharesPerStrategy[_srcChainId][strategy] -= amountVaultShares;
+        exitingSharesPerStrategy[_srcChainId][strategy] += amountVaultShares;
 
-        vault.enterBatchBurn(amount);
+        // TODO Test: Do we need to approve shares? I think so
+        // will revert if amount is more than what we have.
+        // RESP: tests pass but potentially need to test the case where vault
+        // shares exceeds some aribtrary value
+        vault.enterBatchBurn(amountVaultShares);
     }
 
     /// @notice calculate how much available to strategy based on existing shares and current batch burn round
@@ -643,39 +638,34 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice executes a withdrawal of underlying tokens from a vault to a strategy on the source chain
     /// @param _srcChainId what layerZero chainId was the request initiated from
-    /// @param _payload abi encoded as follows:
-    ///    IVault
-    ///    address (of strategy)
-    ///    uint16 (source stargate pool Id)
-    ///    uint16 (dest stargate pool Id)
+    /// @param _payload abi encoded as IHubPayload.FinalizeWithdrawPayload
     function _finalizeWithdrawAction(uint16 _srcChainId, bytes memory _payload)
         internal
         virtual
     {
-        (
-            IVault vault,
-            address strategy,
-            uint16 srcPoolId,
-            uint16 dstPoolId,
-            uint256 minOutUnderlying
-        ) = abi.decode(_payload, (IVault, address, uint16, uint16, uint256));
+        IHubPayload.FinalizeWithdrawPayload memory payload = abi.decode(
+            _payload,
+            (IHubPayload.FinalizeWithdrawPayload)
+        );
+
+        IVault vault = IVault(payload.vault);
+        address strategy = payload.strategy;
 
         require(
             !exiting[address(vault)],
-            "XChainHub: exit window is not closed."
+            "XChainHub::_finalizeWithdrawAction:EXITING"
         );
 
         require(
             trustedVault[address(vault)],
-            "XChainHub: vault is not trusted"
+            "XChainHub::_finalizeWithdrawAction:UNTRUSTED"
         );
 
         require(
             currentRoundPerStrategy[_srcChainId][strategy] > 0,
-            "XChainHub: no withdraws for strategy"
+            "XChainHub::_finalizeWithdrawAction:NO WITHDRAWS"
         );
 
-        // why are we resetting the current round?
         currentRoundPerStrategy[_srcChainId][strategy] = 0;
         exitingSharesPerStrategy[_srcChainId][strategy] = 0;
 
@@ -685,17 +675,23 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             strategy
         );
 
+        /// @dev - do we need this
+        // require(
+        // payload.minOutUnderlying <= strategyAmount,
+        // "XChainHub::_finalizeWithdrawAction:MIN OUT TOO HIGH"
+        // );
+
         IERC20 underlying = vault.underlying();
         underlying.safeApprove(address(stargateRouter), strategyAmount);
 
-        /// @dev review and change minAmountOut and txParams before moving to production
+        /// @dev review and change txParams before moving to production
         stargateRouter.swap{value: msg.value}(
             _srcChainId, // send back to the source
-            srcPoolId,
-            dstPoolId,
+            payload.srcPoolId,
+            payload.dstPoolId,
             payable(refundRecipient),
             strategyAmount,
-            minOutUnderlying,
+            payload.minOutUnderlying,
             IStargateRouter.lzTxObj(200000, 0, "0x"),
             abi.encodePacked(strategy),
             bytes("")
@@ -704,15 +700,13 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @notice underlying holdings are updated on another chain and this function is broadcast
     ///     to all other chains for the strategy.
-    /// @param _payload byte encoded data containing
-    ///     IStrategy
-    ///     uint256 (amount of underyling to report)
+    /// @param _payload byte encoded data adhering to IHubPayload.ReportUnderlyingPayload
     function _reportUnderlyingAction(bytes memory _payload) internal virtual {
-        (IStrategy strategy, uint256 amountToReport) = abi.decode(
+        IHubPayload.ReportUnderlyingPayload memory payload = abi.decode(
             _payload,
-            (IStrategy, uint256)
+            (IHubPayload.ReportUnderlyingPayload)
         );
 
-        strategy.report(amountToReport);
+        IStrategy(payload.strategy).report(payload.amountToReport);
     }
 }
