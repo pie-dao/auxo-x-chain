@@ -30,7 +30,7 @@ run-optimism-test :; forge script --rpc-url https://kovan.optimism.io \
 	-vvvv
 
 
-run-optimism-real :; forge script --rpc-url https://kovan.optimism.io \
+run-optimism-real :; forge script --rpc-url https://optimism-kovan.infura.io/v3/${INFURA_KEY} \
 	scripts/DeployXChain.s.sol:XChainHubOptimism \
 	--private-key ${PRIVATE_KEY} \
 	--broadcast \
@@ -38,7 +38,7 @@ run-optimism-real :; forge script --rpc-url https://kovan.optimism.io \
 
 
 # Deploy the xchain contract - kovan opt
-deploy-kovan-opt :; forge create --rpc-url https://kovan.optimism.io \
+deploy-kovan-opt :; forge create --rpc-url https://optimism-kovan.infura.io/v3/${INFURA_KEY} \
     --constructor-args "0xCC68641528B948642bDE1729805d6cf1DECB0B00" "0x72aB53a133b27Fa428ca7Dc263080807AfEc91b5" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" \
     --private-key ${PRIVATE_KEY} src/XChainStargateHub.sol:XChainStargateHub \
     --etherscan-api-key ${ETHERSCAN_API_KEY_KOVAN_OPTIMISM} \
@@ -53,7 +53,7 @@ deploy-arbitrum-rink :; forge create --rpc-url https://rinkeby.arbitrum.io/rpc \
 
 # Deploy the xchain strategy - kovan opt
 deploy-strat-kovan-opt :; forge create --rpc-url https://kovan.optimism.io \
-    --constructor-args "0x5417b42215921b129aa13a2a54661b6b0e4f87fe" "0xaf29ba76af7ef547b867eba712a776c61b40ed02" "0x567f39d9e6d02078F357658f498F80eF087059aa" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "Test Strategy" \
+    --constructor-args "0x68d5e0e257541180f60273c5e44a179c12ae9280" "0xaf29ba76af7ef547b867eba712a776c61b40ed02" "0x567f39d9e6d02078F357658f498F80eF087059aa" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "0x63BCe354DBA7d6270Cb34dAA46B869892AbB3A79" "Test Strategy" \
     --private-key ${PRIVATE_KEY} src/strategy/XChainStrategyStargate.sol:XChainStrategyStargate \
     --etherscan-api-key ${ETHERSCAN_API_KEY_KOVAN_OPTIMISM} \
     --verify

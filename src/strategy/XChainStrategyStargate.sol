@@ -85,7 +85,7 @@ contract XChainStrategyStargate is BaseStrategy {
         uint256 amount,
         uint256 minAmount,
         DepositParams calldata params
-    ) external {
+    ) external payable {
         require(
             msg.sender == manager || msg.sender == strategist,
             "XChainStrategy: caller not authorized"
@@ -104,7 +104,8 @@ contract XChainStrategyStargate is BaseStrategy {
 
         underlying.safeApprove(address(hub), amount);
 
-        hub.depositToChain(
+        /// @dev get the fees before sending
+        hub.depositToChain{value: msg.value}(
             params.dstChain,
             params.srcPoolId,
             params.dstPoolId,
