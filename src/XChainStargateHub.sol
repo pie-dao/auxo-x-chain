@@ -428,7 +428,8 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     function _reducer(
         uint16 _srcChainId,
         bytes memory _srcAddress,
-        IHubPayload.Message memory message
+        IHubPayload.Message memory message,
+        uint256 amount
     ) internal {
         require(
             msg.sender == address(this) ||
@@ -443,7 +444,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
         }
 
         if (message.action == DEPOSIT_ACTION) {
-            _depositAction(_srcChainId, message.payload);
+            _depositAction(_srcChainId, message.payload, amount);
         } else if (message.action == REQUEST_WITHDRAW_ACTION) {
             _requestWithdrawAction(_srcChainId, message.payload);
         } else if (message.action == FINALIZE_WITHDRAW_ACTION) {
@@ -467,9 +468,9 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
     function sgReceive(
         uint16 _srcChainId,
         bytes memory _srcAddress,
-        uint256,
-        address,
-        uint256,
+        uint256, // nonce
+        address, // the token contract on the local chain
+        uint256 amountLD, // the qty of local _token contract tokens
         bytes memory _payload
     ) external override {
         require(
@@ -489,7 +490,7 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
                 "XChainHub::sgRecieve:PROHIBITED ACTION"
             );
 
-            _reducer(_srcChainId, _srcAddress, message);
+            _reducer(_srcChainId, _srcAddress, message, amountLD);
         }
     }
 
@@ -527,17 +528,18 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
     /// @param _srcChainId what layerZero chainId was the request initiated from
     /// @param _payload abi encoded as IHubPayload.DepositPayload
-    function _depositAction(uint16 _srcChainId, bytes memory _payload)
-        internal
-        virtual
-    {
+    function _depositAction(
+        uint16 _srcChainId,
+        bytes memory _payload,
+        uint256 _amountReceived
+    ) internal virtual {
         IHubPayload.DepositPayload memory payload = abi.decode(
             _payload,
             (IHubPayload.DepositPayload)
         );
 
         IVault vault = IVault(payload.vault);
-        uint256 amount = payload.amountUnderyling;
+        uint256 amount = _amountReceived;
 
         require(
             trustedVault[address(vault)],

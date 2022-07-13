@@ -154,4 +154,7 @@ contract XChainStrategy is BaseStrategy {
 
         reportedUnderlying = reportedAmount;
     }
+
+    /// TODO
+    // Add setters for Hub, etc.
 }
