@@ -618,6 +618,8 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
 
         // TODO Test: Do we need to approve shares? I think so
         // will revert if amount is more than what we have.
+        // RESP: tests pass but potentially need to test the case where vault
+        // shares exceeds some aribtrary value
         vault.enterBatchBurn(amountVaultShares);
     }
 
@@ -686,10 +688,16 @@ contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
             strategy
         );
 
+        /// @dev - do we need this
+        // require(
+        // payload.minOutUnderlying <= strategyAmount,
+        // "XChainHub::_finalizeWithdrawAction:MIN OUT TOO HIGH"
+        // );
+
         IERC20 underlying = vault.underlying();
         underlying.safeApprove(address(stargateRouter), strategyAmount);
 
-        /// @dev review and change minAmountOut and txParams before moving to production
+        /// @dev review and change txParams before moving to production
         stargateRouter.swap{value: msg.value}(
             _srcChainId, // send back to the source
             payload.srcPoolId,

@@ -50,6 +50,13 @@ contract MockVault is ERC20, Pausable {
         );
     }
 
+    // set batch burn artificially for testing
+    function setBatchBurnForRound(uint256 round, BatchBurn memory batchBurn)
+        external
+    {
+        batchBurns[round] = batchBurn;
+    }
+
     // add small diff
     function exchangeRate() public view returns (uint256) {
         return baseUnit + 1e16;

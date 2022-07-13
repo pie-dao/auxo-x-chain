@@ -6,6 +6,18 @@ import {IStargateRouter} from "../../src/interfaces/IStargateRouter.sol";
 contract MockStargateRouter is IStargateRouter {
     bytes[] public callparams;
 
+    struct StargateCallDataParams {
+        uint16 _dstChainId;
+        uint256 _srcPoolId;
+        uint256 _dstPoolId;
+        address payable _refundAddress;
+        uint256 _amountLD;
+        uint256 _minAmountLD;
+        IStargateRouter.lzTxObj _lzTxParams;
+        bytes _to;
+        bytes _payload;
+    }
+
     /// @notice intercept the layerZero send and log the outgoing request
     function swap(
         uint16 _dstChainId,

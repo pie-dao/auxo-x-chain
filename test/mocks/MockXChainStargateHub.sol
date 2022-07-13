@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.12;
-import {XChainStargateHub} from "../../src/XChainStargateHub.sol";
-import {IHubPayload} from "../../src/interfaces/IHubPayload.sol";
+import {XChainStargateHub} from "src/XChainStargateHub.sol";
+import {IHubPayload} from "@interfaces/IHubPayload.sol";
+import {IVault} from "@interfaces/IVault.sol";
 
 /// @title XChainStargateHubMockReducer
 /// @dev test the reducer by overriding calls
@@ -152,6 +153,12 @@ contract XChainStargateHubMockActions is XChainStargateHub {
         _requestWithdrawAction(_srcChainId, _payload);
     }
 
+    function finalizeWithdrawAction(uint16 _srcChainId, bytes memory _payload)
+        external
+    {
+        _finalizeWithdrawAction(_srcChainId, _payload);
+    }
+
     function setCurrentRoundPerStrategy(
         uint16 _srcChainId,
         address _strategy,
@@ -174,5 +181,18 @@ contract XChainStargateHubMockActions is XChainStargateHub {
         uint256 _shares
     ) external {
         exitingSharesPerStrategy[_srcChainId][_strategy] = _shares;
+    }
+
+    function calculateStrategyAmountForWithdraw(
+        IVault _vault,
+        uint16 _srcChainId,
+        address _strategy
+    ) external returns (uint256) {
+        return
+            _calculateStrategyAmountForWithdraw(_vault, _srcChainId, _strategy);
+    }
+
+    function reportUnderlyingAction(bytes memory _payload) external {
+        _reportUnderlyingAction(_payload);
     }
 }
