@@ -20,7 +20,9 @@ import {BaseStrategy} from "./BaseStrategy.sol";
 import {IERC20} from "openzeppelin/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin/token/ERC20/utils/SafeERC20.sol";
 
-contract XChainStrategyStargate is BaseStrategy {
+import {CallFacet} from "../CallFacet.sol";
+
+contract XChainStrategyStargate is BaseStrategy, CallFacet {
     using SafeERC20 for IERC20;
 
     // possible states:
@@ -76,8 +78,10 @@ contract XChainStrategyStargate is BaseStrategy {
         hub = hub_;
     }
 
-    /// @dev TODO REMOVE
-    function setHub(XChainStargateHub hub_) external {
+    //-------------------
+    // Setters
+    //-------------------
+    function setHub(XChainStargateHub hub_) external onlyOwner {
         hub = hub_;
     }
 

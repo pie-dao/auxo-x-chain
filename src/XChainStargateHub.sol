@@ -22,12 +22,13 @@ import {IHubPayload} from "@interfaces/IHubPayload.sol";
 import {IStrategy} from "@interfaces/IStrategy.sol";
 
 import {LayerZeroApp} from "./LayerZeroApp.sol";
+import {CallFacet} from "./CallFacet.sol";
 import {IStargateReceiver} from "@interfaces/IStargateReceiver.sol";
 import {IStargateRouter} from "@interfaces/IStargateRouter.sol";
 
 /// @title XChainHub
 /// @dev Expect this contract to change in future.
-contract XChainStargateHub is LayerZeroApp, IStargateReceiver {
+contract XChainStargateHub is CallFacet, LayerZeroApp, IStargateReceiver {
     using SafeERC20 for IERC20;
 
     // --------------------------
