@@ -155,6 +155,10 @@ contract XChainStargateHub is CallFacet, LayerZeroApp, IStargateReceiver {
     // Single Chain Functions
     // --------------------------
 
+    function setStargateEndpoint(address _stargateEndpoint) external onlyOwner {
+        stargateRouter = IStargateRouter(_stargateEndpoint);
+    }
+
     /// @notice updates a vault on the current chain to be either trusted or untrusted
     function setTrustedVault(address vault, bool trusted) external onlyOwner {
         trustedVault[vault] = trusted;
@@ -712,4 +716,10 @@ contract XChainStargateHub is CallFacet, LayerZeroApp, IStargateReceiver {
 
         IStrategy(payload.strategy).report(payload.amountToReport);
     }
+
+
+    /// TODO 
+    function emergecyWithdraw() virtual {}
+    function setPause() virtual {} // + modifier
+
 }
